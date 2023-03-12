@@ -3,15 +3,6 @@ name = "resume"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "site"
-path = "src/site.rs"
-
-[[bin]]
-name = "sdf_gen"
-path = "src/sdf_gen.rs"
-
-
 [profile.dev]
 opt-level = 1
 
@@ -20,6 +11,7 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = {version = "*", features = ["wayland", "dynamic"]}
-
-
+bevy = {version = "0.9.0", features = ["wayland",  "hdr",  "png",   "jpeg",  "bmp", "ktx2",  ]}
+bevy-inspector-egui = "*"
+bevy_prototype_debug_lines = { version = "*", features = ["3d"] }
+bevy_fly_camera = {git = "https://github.com/mcpar-land/bevy_fly_camera"}
