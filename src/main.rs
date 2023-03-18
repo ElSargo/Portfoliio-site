@@ -18,7 +18,7 @@ fn main() {
         }))
         .add_plugin(MaterialPlugin::<RealTimeCloudMaterial>::default())
         .add_plugin(MaterialPlugin::<NoiseMaterial>::default())
-        .add_plugin(WorldInspectorPlugin {})
+        // .add_plugin(WorldInspectorPlugin {})
         .add_startup_system(setup)
         .add_system(update_cloud)
         .add_plugin(FlyCameraPlugin)
@@ -64,12 +64,6 @@ fn setup(
     asset_server: Res<AssetServer>,
 ) {
     let sun_dir = Vec3::new(1., -1., 0.5);
-    // plane
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 5.0 })),
-        material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
-        ..default()
-    });
 
     // cube
     let mat = cloud_materials.add(RealTimeCloudMaterial {
@@ -106,6 +100,24 @@ fn setup(
         ..default()
     });
 
+    commands.spawn(MaterialMeshBundle {
+        mesh: meshes.add(Mesh::from(shape::Plane {
+            subdivisions: 1,
+            size: 2000.0,
+        })),
+        material: noise_materials.add(NoiseMaterial {
+            color_texture: Some(asset_server.load("textures/cloud.png")),
+            alpha_mode: AlphaMode::Opaque,
+            octaves: 1,
+            scale: 1.,
+            contribution: 1.,
+            falloff: 1.,
+            threshold: 1.,
+        }),
+        transform: Transform::from_xyz(1.5, 0.5, 0.0),
+        ..default()
+    });
+
     // ambient light
     // NOTE: The ambient light is used to scale how bright the environment map is so with a bright
     // environment map, use an appropriate colour and brightness to match
@@ -128,6 +140,10 @@ fn setup(
     // camera
     let mut camera = commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+        camera: Camera {
+            hdr: true,
+            ..default()
+        },
         ..default()
     });
     camera.insert(CameraController::default());
