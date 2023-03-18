@@ -101,10 +101,7 @@ fn setup(
     });
 
     commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane {
-            subdivisions: 1,
-            size: 2000.0,
-        })),
+        mesh: meshes.add(Mesh::from(shape::Plane { size: 2000.0 })),
         material: noise_materials.add(NoiseMaterial {
             color_texture: Some(asset_server.load("textures/cloud.png")),
             alpha_mode: AlphaMode::Opaque,
