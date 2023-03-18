@@ -101,15 +101,18 @@ fn setup(
     });
 
     commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 2000.0 })),
-        material: noise_materials.add(NoiseMaterial {
-            color_texture: Some(asset_server.load("textures/cloud.png")),
-            alpha_mode: AlphaMode::Opaque,
-            octaves: 1,
-            scale: 1.,
-            contribution: 1.,
-            falloff: 1.,
-            threshold: 1.,
+        mesh: meshes.add(Mesh::from(shape::Plane { size: 20.0 })),
+        material: materials.add(StandardMaterial {
+            // base_color: Color::rgba(0.3, 0.8, 0.9, 0.9),
+            alpha_mode: AlphaMode::Blend,
+            // perceptual_roughness: 0.1,
+            metallic: 1.,
+            reflectance: 1.,
+            metallic_roughness_texture: Some(asset_server.load("textures/Water_001_SPEC.jpg")),
+            base_color_texture: Some(asset_server.load("textures/Water_001_COLOR.jpg")),
+            normal_map_texture: Some(asset_server.load("textures/Water_001_NORM.jpg")),
+            occlusion_texture: Some(asset_server.load("textures/Water_001_OCC.jpg")),
+            ..default()
         }),
         transform: Transform::from_xyz(1.5, 0.5, 0.0),
         ..default()
@@ -128,7 +131,7 @@ fn setup(
         directional_light: DirectionalLight {
             color: Color::rgb(1., 0.8, 0.6),
             illuminance: 20_000.0,
-            shadows_enabled: false,
+            shadows_enabled: true,
             ..default()
         },
         transform: Transform::from_xyz(0.0, 0.0, 0.0).looking_at(sun_dir, Vec3::Y),
