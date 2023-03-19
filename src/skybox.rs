@@ -1,10 +1,7 @@
 //! Load a cubemap texture onto a cube like a skybox and cycle through different compressed texture formats
 
-use std::f32::consts::PI;
-
 use bevy::{
     asset::LoadState,
-    input::mouse::MouseMotion,
     pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
     reflect::TypeUuid,
@@ -33,10 +30,7 @@ impl Plugin for SkyBoxPlugin {
     }
 }
 
-const CUBEMAP: (&str, CompressedImageFormats) = (
-    "textures/Ryfjallet_cubemap_etc2.ktx2",
-    CompressedImageFormats::ETC2,
-);
+const CUBEMAP: (&str, CompressedImageFormats) = ("textures/sky.png", CompressedImageFormats::NONE);
 
 #[derive(Resource)]
 pub struct Cubemap {
@@ -46,10 +40,6 @@ pub struct Cubemap {
 }
 
 pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    use crate::CameraController;
-
-    // directional 'sun' light
-
     let skybox_handle = asset_server.load(CUBEMAP.0);
 
     commands.insert_resource(Cubemap {
@@ -80,7 +70,7 @@ pub fn cycle_cubemap_asset(
     let supported_compressed_formats =
         CompressedImageFormats::from_features(render_device.features());
 
-    let mut new_index = cubemap.index;
+    let new_index = cubemap.index;
     if !supported_compressed_formats.contains(CUBEMAP.1) {
         panic!("Skipping unsupported format: {:?}", CUBEMAP)
     }
@@ -144,16 +134,16 @@ pub fn asset_loaded(
     }
 }
 
-pub fn animate_light_direction(
-    time: Res<Time>,
-    mut query: Query<&mut Transform, With<DirectionalLight>>,
-) {
-    for mut transform in &mut query {
-        transform.rotate_y(time.delta_seconds() * 0.5);
-    }
-}
+// pub fn animate_light_direction(
+//     time: Res<Time>,
+//     mut query: Query<&mut Transform, With<DirectionalLight>>,
+// ) {
+//     for mut transform in &mut query {
+//         transform.rotate_y(time.delta_seconds() * 0.5);
+//     }
+// }
 
-use crate::camera::camera_controller;
+// use crate::camera::camera_controller;
 
 #[derive(Debug, Clone, TypeUuid, Eq, Hash, PartialEq)]
 #[uuid = "9509a0f8-3c05-48ee-a13e-a93226c7f488"]

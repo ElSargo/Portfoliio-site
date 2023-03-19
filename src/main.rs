@@ -5,9 +5,12 @@ use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use cloud_shader::RealTimeCloudMaterial;
 use noise_shader::NoiseMaterial;
+use skybox::{CubemapMaterial, SkyBoxPlugin};
 mod camera;
+mod cloud_gen;
 mod cloud_shader;
 mod noise_shader;
+mod sdf;
 mod skybox;
 
 fn main() {
@@ -18,12 +21,12 @@ fn main() {
         }))
         .add_plugin(MaterialPlugin::<RealTimeCloudMaterial>::default())
         .add_plugin(MaterialPlugin::<NoiseMaterial>::default())
-        // .add_plugin(WorldInspectorPlugin {})
+        .add_plugin(WorldInspectorPlugin {})
         .add_startup_system(setup)
         .add_system(update_cloud)
         .add_plugin(FlyCameraPlugin)
-        // .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
-        // .add_plugin(SkyBoxPlugin {})
+        .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
+        .add_plugin(SkyBoxPlugin {})
         .run();
 }
 
@@ -63,7 +66,7 @@ fn setup(
     mut noise_materials: ResMut<Assets<NoiseMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    let sun_dir = Vec3::new(1., -1., 0.5);
+    let sun_dir = Vec3::new(-1., -0.2, 0.1);
 
     // cube
     let mat = cloud_materials.add(RealTimeCloudMaterial {
@@ -101,17 +104,17 @@ fn setup(
     });
 
     commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(Mesh::from(shape::Plane { size: 20.0 })),
+        mesh: meshes.add(cloud_gen::test()),
         material: materials.add(StandardMaterial {
-            // base_color: Color::rgba(0.3, 0.8, 0.9, 0.9),
-            alpha_mode: AlphaMode::Blend,
-            // perceptual_roughness: 0.1,
-            metallic: 1.,
-            reflectance: 1.,
-            metallic_roughness_texture: Some(asset_server.load("textures/Water_001_SPEC.jpg")),
-            base_color_texture: Some(asset_server.load("textures/Water_001_COLOR.jpg")),
-            normal_map_texture: Some(asset_server.load("textures/Water_001_NORM.jpg")),
-            occlusion_texture: Some(asset_server.load("textures/Water_001_OCC.jpg")),
+            base_color: Color::rgba(1.0, 1., 1., 1.),
+            alpha_mode: AlphaMode::Opaque,
+            perceptual_roughness: 0.9,
+            metallic: 0.,
+            reflectance: 0.2,
+            // metallic_roughness_texture: Some(asset_server.load("textures/Water_001_SPEC.jpg")),
+            // base_color_texture: Some(asset_server.load("textures/Water_001_COLOR.jpg")),
+            // normal_map_texture: Some(asset_server.load("textures/Water_001_NORM.jpg")),
+            // occlusion_texture: Some(asset_server.load("textures/Water_001_OCC.jpg")),
             ..default()
         }),
         transform: Transform::from_xyz(1.5, 0.5, 0.0),
@@ -122,14 +125,14 @@ fn setup(
     // NOTE: The ambient light is used to scale how bright the environment map is so with a bright
     // environment map, use an appropriate colour and brightness to match
     commands.insert_resource(AmbientLight {
-        color: Color::rgb_u8(210, 220, 240),
+        color: Color::rgb(0.9, 0.95, 1.),
         brightness: 1.0,
     });
 
     // light
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            color: Color::rgb(1., 0.8, 0.6),
+            color: Color::rgb(1.2, 1., 0.9),
             illuminance: 20_000.0,
             shadows_enabled: true,
             ..default()
@@ -147,5 +150,8 @@ fn setup(
         ..default()
     });
     camera.insert(CameraController::default());
-    camera.insert(FlyCamera::default());
+    camera.insert(FlyCamera {
+        sensitivity: 10.,
+        ..default()
+    });
 }

@@ -608,7 +608,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d434c77ab766c806ed9062ef8a7285b3b02b47df51f188d4496199c3ac062eaf"
 dependencies = [
- "glam",
+ "glam 0.22.0",
  "serde",
 ]
 
@@ -618,7 +618,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbfb5908d33fd613069be516180b8f138aaaf6e41c36b1fd98c6c29c00c24a13"
 dependencies = [
- "glam",
+ "glam 0.22.0",
 ]
 
 [[package]]
@@ -670,7 +670,7 @@ dependencies = [
  "bevy_utils",
  "downcast-rs",
  "erased-serde",
- "glam",
+ "glam 0.22.0",
  "once_cell",
  "parking_lot",
  "serde",
@@ -1438,7 +1438,7 @@ checksum = "48ec50086547d597b5c871a78399ec04a14828a6a5c445a61ed4687c540edec6"
 dependencies = [
  "const_panic",
  "encase_derive",
- "glam",
+ "glam 0.22.0",
  "thiserror",
 ]
 
@@ -1521,6 +1521,16 @@ name = "event-listener"
 version = "2.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0206175f82b8d6bf6652ff7d71a1e27fd2e4efde587fd368662814d6ec1d9ce0"
+
+[[package]]
+name = "fast-surface-nets"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d332c6935fee77eb269b29eb27c92dbfe4b4043592c399fb3f6a4e5a1aa03ad3"
+dependencies = [
+ "glam 0.20.5",
+ "ndshape",
+]
 
 [[package]]
 name = "fastrand"
@@ -1692,6 +1702,12 @@ dependencies = [
 
 [[package]]
 name = "glam"
+version = "0.20.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f43e957e744be03f5801a55472f593d43fabdebf25a4585db250f04d86b1675f"
+
+[[package]]
+name = "glam"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12f597d56c1bd55a811a1be189459e8fad2bbc272616375602443bdfb37fa774"
@@ -1856,7 +1872,7 @@ version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "619ce654558681d7d0a7809e1b20249c7032ff13ee6baa7bb7ff64f7f28a906a"
 dependencies = [
- "glam",
+ "glam 0.22.0",
  "once_cell",
 ]
 
@@ -2325,6 +2341,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ndshape"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "975bce586ad637e27f6dc26ee907c07050686a588695bfd64b7873a9d48a700c"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "nix"
 version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2789,6 +2814,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_fly_camera",
  "bevy_prototype_debug_lines",
+ "fast-surface-nets",
 ]
 
 [[package]]

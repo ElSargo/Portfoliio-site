@@ -29,6 +29,7 @@
 
           buildInputs = [
             rust
+            pkgs.lld
             pkgs.lldb_9
             pkgs.sccache
             pkgs.mold
