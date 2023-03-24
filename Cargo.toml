@@ -11,8 +11,8 @@ opt-level = 1
 opt-level = 3
 
 [dependencies]
-bevy = {version = "0.9.0", features = ["wayland",  "hdr",  "png",   "jpeg",  "bmp", "ktx2",  ]}
-bevy-inspector-egui = "*"
+bevy = {version = "0.10.0", features = ["wayland",  "hdr",  "png",   "jpeg",  "bmp", "ktx2",  ]}
+bevy-inspector-egui = "0.18.1"
 bevy_prototype_debug_lines = { version = "*", features = ["3d"] }
-bevy_fly_camera = {git = "https://github.com/mcpar-land/bevy_fly_camera"}
+bevy_fly_camera = "0.10.0"
 fast-surface-nets = "0.2.0"

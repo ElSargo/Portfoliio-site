@@ -1,9 +1,27 @@
-use std::ops::Mul;
+pub fn sdf(position: Vec3) -> f32 {
+    let d = sd_ellipsoid(position - vec3(0., -0.15, 0.), vec3(0.5, 0.2, 0.5));
+    let fbm = sd_fbm(
+        position * 2. + vec3(100.123, -23.13, 124.23),
+        d, /*0.075*/
+    ) / 2.;
+    // let ma = mat3(
+    //     vec3(0.00, 1.60, 1.20),
+    //     vec3(-1.60, 0.72, -0.96),
+    //     vec3(-1.20, -0.96, 1.28),
+    // );
+    // let fbm2 = sd_fbm(ma * position * 2. + vec3(-223.123, -1.13, -314.23), 0.075) / 2.;
 
-use bevy::{
-    math::{mat3, vec3, Vec3Swizzles},
-    prelude::Vec3,
-};
+    // smooth_min(
+    //     smooth_max(smooth_min(fbm, fbm2, 0.01), d - 0.2, 0.1),
+    //     d,
+    //     0.2,
+    // )
+    fbm
+}
+
+fn scale<C: Fn(Vec3) -> f32>(p: Vec3, f: f32, sdf: C) -> f32 {
+    sdf(p * f) / f
+}
 
 fn sd_grid_sphere(i: Vec3, f: Vec3, c: Vec3) -> f32 {
     // random radius at grid vertex i+c
@@ -33,11 +51,20 @@ fn sd_fbm(p: Vec3, d: f32) -> f32 {
     let mut s = 1.;
     for _ in 0..6 {
         // evaluate new octave
-        let mut n = s * sd_base(p);
+        {
+            let mut n = s * sd_base(p);
 
-        // add
-        n = smooth_max(n, d - 0.1 * s, 0.3 * s);
-        d = smooth_min(n, d, 0.3 * s);
+            // add
+            n = smooth_max(n, d - 0.1 * s, 0.3 * s);
+            d = smooth_min(n, d, 0.3 * s);
+        }
+        {
+            let mut n = s * sd_base(p + 100.);
+
+            // add
+            n = smooth_max(n, d - 0.1 * s, 0.3 * s);
+            d = smooth_min(n, d, 0.3 * s);
+        }
 
         // prepare next octave
         p = mat3(
@@ -46,7 +73,7 @@ fn sd_fbm(p: Vec3, d: f32) -> f32 {
             vec3(-1.20, -0.96, 1.28),
         ) * p;
 
-        s = 0.5 * s;
+        s = 0.4 * s;
     }
     return d;
 }
@@ -71,10 +98,8 @@ fn sd_ellipsoid(p: Vec3, r: Vec3) -> f32 {
     k0 * (k0 - 1.0) / k1
 }
 
-pub fn sdf(position: Vec3) -> f32 {
-    let d = sd_ellipsoid(position, vec3(0.2, 0.1, 0.2));
-    let fbm = sd_fbm(position, 0.01) * 2.;
-    fbm + d - 0.1
+fn sd_sphere(p: Vec3, r: f32) -> f32 {
+    p.length() - r
 }
 
 fn hash13(p: Vec3) -> f32 {
@@ -82,3 +107,9 @@ fn hash13(p: Vec3) -> f32 {
     p += p.dot(p.zyx() + 31.32);
     return ((p.x + p.y) * p.z).fract();
 }
+
+use bevy::{
+    math::{mat3, vec3, Vec3Swizzles},
+    prelude::Vec3,
+};
+use std::ops::Mul;

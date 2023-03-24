@@ -1,9 +1,9 @@
 // use crate::skybox::CubemapMaterial;
 // use skybox::SkyBoxPlugin;
-use bevy::prelude::*;
+use bevy::{core_pipeline::bloom::BloomSettings, prelude::*};
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use cloud_shader::RealTimeCloudMaterial;
+use cloud_shader::CloudMaterial;
 use noise_shader::NoiseMaterial;
 use skybox::{CubemapMaterial, SkyBoxPlugin};
 mod camera;
@@ -12,6 +12,7 @@ mod cloud_shader;
 mod noise_shader;
 mod sdf;
 mod skybox;
+mod test_cloud_shader;
 
 fn main() {
     App::new()
@@ -19,9 +20,9 @@ fn main() {
             watch_for_changes: true,
             ..Default::default()
         }))
-        .add_plugin(MaterialPlugin::<RealTimeCloudMaterial>::default())
+        .add_plugin(MaterialPlugin::<CloudMaterial>::default())
         .add_plugin(MaterialPlugin::<NoiseMaterial>::default())
-        .add_plugin(WorldInspectorPlugin {})
+        .add_plugin(WorldInspectorPlugin::new())
         .add_startup_system(setup)
         .add_system(update_cloud)
         .add_plugin(FlyCameraPlugin)
@@ -35,59 +36,25 @@ struct CameraController {}
 
 fn update_cloud(
     cam: Query<&Transform, With<CameraController>>,
-    clouds: Query<(&Transform, &Cloud)>,
-    mut materials: ResMut<Assets<RealTimeCloudMaterial>>,
+    mut materials: ResMut<Assets<CloudMaterial>>,
 ) {
-    let cam_pos = cam.get_single().unwrap().translation;
-    for (transform, handle) in clouds.iter() {
-        let material = match materials.get_mut(&handle.material) {
-            Some(handle) => handle,
-            None => {
-                println!("No handle");
-                continue;
-            }
-        };
-        material.cam_pos = cam_pos;
-        material.box_pos = transform.translation;
-        material.box_size = transform.scale;
+    let camera_position = cam.get_single().unwrap().translation;
+    for material in materials.iter_mut() {
+        material.1.camera_position = camera_position
     }
-}
-
-#[derive(Component)]
-struct Cloud {
-    material: Handle<RealTimeCloudMaterial>,
 }
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut cloud_materials: ResMut<Assets<RealTimeCloudMaterial>>,
+    // mut materials: ResMut<Assets<StandardMaterial>>,
+    mut cloud_materials: ResMut<Assets<CloudMaterial>>,
     mut noise_materials: ResMut<Assets<NoiseMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     let sun_dir = Vec3::new(-1., -0.2, 0.1);
 
     // cube
-    let mat = cloud_materials.add(RealTimeCloudMaterial {
-        color: Color::BLUE,
-        sun_dir: sun_dir.normalize(),
-        cam_pos: Vec3::new(-2.0, 2.5, 5.0),
-        box_pos: Vec3::new(0., 0., 0.),
-        box_size: Vec3::new(0., 0., 0.),
-        color_texture: Some(asset_server.load("textures/cloud.png")),
-        alpha_mode: AlphaMode::Blend,
-    });
-
-    commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
-            material: mat.clone(),
-            transform: Transform::from_xyz(0.0, 0.5, 0.0),
-            ..default()
-        })
-        .insert(Cloud { material: mat });
-
     commands.spawn(MaterialMeshBundle {
         mesh: meshes.add(Mesh::from(shape::Cube { size: 1.0 })),
         material: noise_materials.add(NoiseMaterial {
@@ -104,20 +71,10 @@ fn setup(
     });
 
     commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(cloud_gen::test()),
-        material: materials.add(StandardMaterial {
-            base_color: Color::rgba(1.0, 1., 1., 1.),
-            alpha_mode: AlphaMode::Opaque,
-            perceptual_roughness: 0.9,
-            metallic: 0.,
-            reflectance: 0.2,
-            // metallic_roughness_texture: Some(asset_server.load("textures/Water_001_SPEC.jpg")),
-            // base_color_texture: Some(asset_server.load("textures/Water_001_COLOR.jpg")),
-            // normal_map_texture: Some(asset_server.load("textures/Water_001_NORM.jpg")),
-            // occlusion_texture: Some(asset_server.load("textures/Water_001_OCC.jpg")),
-            ..default()
-        }),
-        transform: Transform::from_xyz(1.5, 0.5, 0.0),
+        // mesh: meshes.add(cloud_gen::new(100.)),
+        mesh: meshes.add(shape::Box::new(1., 1., 1.).into()),
+        material: cloud_materials.add(CloudMaterial { ..default() }),
+        transform: Transform::from_xyz(-1.5, -0.0, 0.0),
         ..default()
     });
 
@@ -125,14 +82,14 @@ fn setup(
     // NOTE: The ambient light is used to scale how bright the environment map is so with a bright
     // environment map, use an appropriate colour and brightness to match
     commands.insert_resource(AmbientLight {
-        color: Color::rgb(0.9, 0.95, 1.),
+        color: Color::rgb(0.54, 0.8, 1.),
         brightness: 1.0,
     });
 
     // light
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            color: Color::rgb(1.2, 1., 0.9),
+            color: Color::rgb(2.2, 2.05, 1.9),
             illuminance: 20_000.0,
             shadows_enabled: true,
             ..default()
@@ -141,14 +98,20 @@ fn setup(
         ..default()
     });
     // camera
-    let mut camera = commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        camera: Camera {
-            hdr: true,
+    let mut camera = commands.spawn((
+        Camera3dBundle {
+            transform: Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
+            camera: Camera {
+                hdr: true,
+                ..default()
+            },
             ..default()
         },
-        ..default()
-    });
+        BloomSettings {
+            intensity: 0.1,
+            ..default()
+        },
+    ));
     camera.insert(CameraController::default());
     camera.insert(FlyCamera {
         sensitivity: 10.,

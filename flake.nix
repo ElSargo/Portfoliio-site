@@ -9,6 +9,7 @@
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
+
   outputs = { self, nixpkgs, flake-utils, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
@@ -31,7 +32,6 @@
             rust
             pkgs.lld
             pkgs.lldb_9
-            pkgs.sccache
             pkgs.mold
             pkgs.clang
             pkgs.fish
