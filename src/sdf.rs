@@ -1,26 +1,19 @@
 pub fn sdf(position: Vec3) -> f32 {
-    let d = sd_ellipsoid(position - vec3(0., -0.15, 0.), vec3(0.5, 0.2, 0.5));
-    let fbm = sd_fbm(
-        position * 2. + vec3(100.123, -23.13, 124.23),
-        d, /*0.075*/
-    ) / 2.;
-    // let ma = mat3(
-    //     vec3(0.00, 1.60, 1.20),
-    //     vec3(-1.60, 0.72, -0.96),
-    //     vec3(-1.20, -0.96, 1.28),
-    // );
-    // let fbm2 = sd_fbm(ma * position * 2. + vec3(-223.123, -1.13, -314.23), 0.075) / 2.;
-
-    // smooth_min(
-    //     smooth_max(smooth_min(fbm, fbm2, 0.01), d - 0.2, 0.1),
-    //     d,
-    //     0.2,
-    // )
-    fbm
+    let d = sd_ellipsoid(position.yzx(), vec3(0.7, 0.5, 0.7));
+    let fbm = sd_fbm(position * 2. + vec3(100.123, -23.13, 124.23), d, 6) / 2.;
+    // fbm
+    d
 }
 
-fn scale<C: Fn(Vec3) -> f32>(p: Vec3, f: f32, sdf: C) -> f32 {
-    sdf(p * f) / f
+const ROTATE: Mat3 = mat3(
+    vec3(0.00, 1.60, 1.20),
+    vec3(-1.60, 0.72, -0.96),
+    vec3(-1.20, -0.96, 1.28),
+);
+
+fn sd_torus(p: Vec3, t: Vec2) -> f32 {
+    let q = vec2(p.xz().length() - t.x, p.y);
+    return q.length() - t.y;
 }
 
 fn sd_grid_sphere(i: Vec3, f: Vec3, c: Vec3) -> f32 {
@@ -45,11 +38,11 @@ fn sd_base(p: Vec3) -> f32 {
         .min(sd_grid_sphere(i, f, vec3(1.0, 1.0, 1.0)))
 }
 
-fn sd_fbm(p: Vec3, d: f32) -> f32 {
+pub fn sd_fbm(p: Vec3, d: f32, octaves: i32) -> f32 {
     let mut p = p;
     let mut d = d;
     let mut s = 1.;
-    for _ in 0..6 {
+    for _ in 0..octaves {
         // evaluate new octave
         {
             let mut n = s * sd_base(p);
@@ -67,11 +60,7 @@ fn sd_fbm(p: Vec3, d: f32) -> f32 {
         }
 
         // prepare next octave
-        p = mat3(
-            vec3(0.00, 1.60, 1.20),
-            vec3(-1.60, 0.72, -0.96),
-            vec3(-1.20, -0.96, 1.28),
-        ) * p;
+        p = ROTATE * p;
 
         s = 0.4 * s;
     }
@@ -109,7 +98,7 @@ fn hash13(p: Vec3) -> f32 {
 }
 
 use bevy::{
-    math::{mat3, vec3, Vec3Swizzles},
-    prelude::Vec3,
+    math::{mat3, vec2, vec3, Vec3Swizzles},
+    prelude::{Mat3, Vec2, Vec3},
 };
 use std::ops::Mul;
