@@ -1,4 +1,4 @@
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 use crate::noise::noise;
 use crate::sdf::sdf as cloud_sdf;
@@ -36,27 +36,36 @@ pub fn new(res: f32) -> Vec<Vec4> {
     println!("Marching");
     for (i, [x, y, z]) in (0..buffer_size).map(|i| (i, delinearize(buffer_side_length, i))) {
         //                     y
-        let sun = vec3(1., 0., 1.).normalize();
+        let sun_base = vec3(1., 0., 1.).normalize();
         // March to the sun
-        let mut p = coord_to_pos([x, y, z], res);
-        assert_eq!([x, y, z], pos_to_coord(p, res));
-        let mut t = 1.;
+        let mut total = 0.;
         let dt = 2. / res;
-        while let Some(sample) = sdf.get(linearize(buffer_side_length, pos_to_coord(p, res))) {
-            if p.x.abs() > 1. || p.y.abs() > 1. || p.z.abs() > 1. {
-                break;
+        for sun in [
+            sun_base.add(vec3(0.1, 0., 0.1)).normalize(),
+            sun_base.add(vec3(-0.1, 0., 0.1)).normalize(),
+            sun_base.add(vec3(0.1, 0., -0.1)).normalize(),
+            sun_base.add(vec3(-0.1, 0., -0.1)).normalize(),
+            sun_base,
+        ] {
+            let mut t = 1.;
+            let mut p = coord_to_pos([x, y, z], res);
+            while let Some(samp) = sdf.get(linearize(buffer_side_length, pos_to_coord(p, res))) {
+                if p.x.abs() > 1. || p.y.abs() > 1. || p.z.abs() > 1. {
+                    break;
+                }
+                if i == 1 {
+                    println! {"{:?} [:] {t} [:] {:?}",p,pos_to_coord(p, res)};
+                }
+                let distance = samp.x;
+                let noise = mix(0_f32.max(samp.y + samp.w), 1., 0.5);
+                if distance < 0.05 + noise * 0.1 {
+                    t *= (noise * -7. * dt).min(0.).exp();
+                }
+                p += sun * dt;
             }
-            if i == 1 {
-                println! {"{:?} [:] {t} [:] {:?}",p,pos_to_coord(p, res)};
-            }
-            let distance = sample.x;
-            let noise = mix(sample.y, sample.w, 0.33) + 0.1;
-            if distance < 0.05 + noise * 0.1 {
-                t *= (noise * -15. * dt).min(0.).exp();
-            }
-            p += sun * dt;
+            total += t;
         }
-        sdf[i].z = t;
+        sdf[i].z = total * 0.2;
     }
     sdf
 }

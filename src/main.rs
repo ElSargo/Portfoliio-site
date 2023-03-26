@@ -2,7 +2,7 @@
 // use skybox::SkyBoxPlugin;
 use bevy::{
     core_pipeline::bloom::BloomSettings,
-    diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    // diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
     math::vec3,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -35,8 +35,8 @@ fn main() {
         .add_plugin(FlyCameraPlugin)
         .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
         .add_plugin(SkyBoxPlugin {})
-        .add_plugin(LogDiagnosticsPlugin::default())
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        // .add_plugin(LogDiagnosticsPlugin::default())
+        // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .run();
 }
 
@@ -58,11 +58,11 @@ fn update_cloud(
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
+    // asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut materials: ResMut<Assets<StandardMaterial>>,
     mut cloud_materials: ResMut<Assets<CloudMaterial>>,
-    mut noise_materials: ResMut<Assets<NoiseMaterial>>,
+    // mut noise_materials: ResMut<Assets<NoiseMaterial>>,
     mut images: ResMut<Assets<Image>>,
 ) {
     let sun_dir = Vec3::new(-1., -0.2, 0.1);
@@ -154,10 +154,7 @@ fn setup(
             // tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
             ..default()
         },
-        BloomSettings {
-            intensity: 0.1,
-            ..default()
-        },
+        BloomSettings { ..default() },
     ));
     camera.insert(CameraController::default());
     camera.insert(FlyCamera {

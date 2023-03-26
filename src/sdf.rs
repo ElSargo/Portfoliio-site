@@ -1,5 +1,5 @@
 pub fn sdf(position: Vec3) -> f32 {
-    let d = sd_ellipsoid(position.yzx(), vec3(0.7, 0.5, 0.7));
+    let d = sd_ellipsoid(position.yzx(), vec3(0.5, 0.2, 0.4));
     let fbm = sd_fbm(position * 2. + vec3(100.123, -23.13, 124.23), d, 6) / 2.;
     // fbm
     d

@@ -98,8 +98,19 @@ fn hash13(p3: vec3<f32>) -> f32
 
 fn sdf(p: vec3<f32>, tex: texture_2d<f32>, samp: sampler) -> vec4<f32>{
     var p = p + 0.5;
-    let x = p.x / material.texture_dim.x + floor(p.z*material.texture_dim.x)/material.texture_dim.x;
-    return textureSample(tex, samp, vec2(x,p.y));
+    let coord = p.z*material.texture_dim.x;
+    let blend = coord % 1.;
+    let l1 = floor(coord);
+    let l2 = l1+1.;
+    let x = p.x / material.texture_dim.x;
+    let x1 = x + l1  / material.texture_dim.x;
+    let x2 = x + l2 / material.texture_dim.x;
+    return textureSample(tex, samp, vec2(x1,p.y));
+    // return mix(
+    // textureSample(tex, samp, vec2(x1,p.y)),
+    // textureSample(tex, samp, vec2(x2,p.y)),
+    // blend
+    // );
 }
 
 @fragment
@@ -112,32 +123,32 @@ fn fragment(
     let mei = mie(dot(rd,sun_dir));
     var p = world_position.xyz;
     var dt = 0.02;
-    var d = 0.;
+    var t = 0.;
     var light = vec3(0.);
     var transmission = 1.;
     let intersection =  boxIntersection(ro, rd, vec3(0.5));
-    for (var i = max(intersection.x, 0.) + hash13(vec3(uv*913.123,material.time*1.))*dt*2.;i < intersection.y; i += dt) {
+    for (var i = max(intersection.x, 0.) + hash13(vec3(uv*913.123,material.time*1.))*0.1;i < intersection.y; i += dt) {
+        t += 1.;
         p = ro + i * rd;
         let samp = sdf(p, volume_tex,volume_sampler);
-        // let sampy = sdf_d(fract(p*3.)- 0.5, volume_tex,volume_sampler);
-        d = samp.x;
-        let dens = mix(samp.y,samp.w,0.33)+0.1;
+        let d = samp.x;
+        let dens = mix(max(0.,samp.y+samp.w),1.,0.5);
         if d < 0.0 + dens*0.2{
-            transmission *= exp(-dt*dens*15.);
-            light += //( samp.z * mei * 30. + samp.z * 0. + dens * 2. + 1.)//+ vec3(1.,1.2,1.4))
-                (samp.z * (mei + .2) * vec3(300.,270.,250.) + (dens*2. + 1.)*vec3(1.,1.3,1.5))
-                *  transmission * dt  ;
+            transmission *= exp(-dt*dens*7.);
+            light += ( samp.z * mei * 300. + dens * 2. + 1.) *  transmission * dt  ;
         }
         if transmission < 0.1 {
+            transmission = 0.;
             break;
         }
-        dt = clamp(samp.x - 0.3,0.02,0.1);
-        // t += 0.1;
+        dt = clamp(abs(samp.x*0.5) - 0.1,0.02,0.1);
     }
-
+    light = max(vec3(0.05), light);
     
     // return vec4(n(world_position.xyz*4.));
     // return vec4( vec3(0.,1.,0.,)*sdf(vec3(world_position.xy,0.1),volume_tex,volume_sampler).xyz,1. );
     return vec4(light,1. - transmission);
+    // return vec4(vec3(t),1.)*.3;
+
     // return vec4(vec3(mie(dot(sun_dir,rd))),1.);
 }
