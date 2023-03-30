@@ -3,7 +3,7 @@
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
-    render::render_resource::{AsBindGroup, ShaderRef},
+    render::render_resource::{AsBindGroup, Face, ShaderRef},
 };
 
 /// The Material trait is very configurable, but comes with sensible defaults for all methods.
@@ -23,7 +23,7 @@ impl Material for CloudMaterial {
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056e0"]
 pub struct CloudMaterial {
     #[uniform(0)]
-    pub color: Color,
+    pub sun_direction: Vec3,
     #[uniform(0)]
     pub camera_position: Vec3,
     #[uniform(0)]
@@ -31,9 +31,13 @@ pub struct CloudMaterial {
     #[uniform(0)]
     pub texture_dimensions: Vec3,
     #[uniform(0)]
+    pub scale: Vec3,
+    #[uniform(0)]
     pub time: f32,
-    #[texture(1)]
+    #[texture(1, dimension = "3d")]
     #[sampler(2)]
     pub sdf: Option<Handle<Image>>,
     pub alpha_mode: AlphaMode,
+    #[reflect(ignore)]
+    pub cull_mode: Option<Face>,
 }

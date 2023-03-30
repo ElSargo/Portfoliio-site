@@ -10,7 +10,6 @@ use bevy::{
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use cloud_shader::CloudMaterial;
-use noise_shader::NoiseMaterial;
 use skybox::{CubemapMaterial, SkyBoxPlugin};
 mod camera;
 mod cloud_gen;
@@ -27,11 +26,9 @@ fn main() {
             watch_for_changes: true,
             ..Default::default()
         }))
-        .add_plugin(MaterialPlugin::<CloudMaterial>::default())
-        .add_plugin(MaterialPlugin::<NoiseMaterial>::default())
         .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(CloudPlugin)
         .add_startup_system(setup)
-        .add_system(update_cloud)
         .add_plugin(FlyCameraPlugin)
         .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
         .add_plugin(SkyBoxPlugin {})
@@ -43,16 +40,43 @@ fn main() {
 #[derive(Component, Default)]
 struct CameraController {}
 
+#[derive(Component, Default)]
+struct Cloud {
+    handle: Handle<CloudMaterial>,
+}
+
+struct CloudPlugin;
+
+impl Plugin for CloudPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugin(MaterialPlugin::<CloudMaterial>::default());
+        app.add_system(update_cloud);
+    }
+}
+
 fn update_cloud(
     cam: Query<&Transform, With<CameraController>>,
+    clouds: Query<(&Cloud, &Transform)>,
     mut materials: ResMut<Assets<CloudMaterial>>,
     time: Res<Time>,
 ) {
     let camera_position = cam.get_single().unwrap().translation;
-    for material in materials.iter_mut() {
-        material.1.camera_position = camera_position;
-        material.1.time = time.raw_elapsed_seconds();
-        // println!("{:?}", time.raw_elapsed_seconds());
+    for (cloud, transform) in &clouds {
+        if let Some(material) = materials.get_mut(&cloud.handle) {
+            material.camera_position = camera_position;
+            material.time = time.raw_elapsed_seconds();
+            material.aabb_position = transform.translation;
+            material.scale = transform.scale;
+            let relative = (camera_position - transform.translation).abs();
+            material.cull_mode = if relative.x > transform.scale.x
+                || relative.y > transform.scale.y
+                || relative.z > transform.scale.z
+            {
+                Some(bevy::render::render_resource::Face::Front)
+            } else {
+                Some(bevy::render::render_resource::Face::Back)
+            };
+        }
     }
 }
 
@@ -84,44 +108,45 @@ fn setup(
     // });
 
     {
-        let res = 127;
-        let resf = res as f32;
-        commands.spawn(MaterialMeshBundle {
-            // mesh: meshes.add(cloud_gen::new(100.)),
-            mesh: meshes.add(shape::Box::new(1., 1., 1.).into()),
-            material: cloud_materials.add(CloudMaterial {
-                sdf: Some(
-                    images.add(Image::new(
-                        Extent3d {
-                            width: res * res,
-                            height: res,
-                            depth_or_array_layers: 1,
-                        },
-                        TextureDimension::D2,
-                        cloud_gen::new(resf)
-                            .iter()
-                            .map(|v| {
-                                [
-                                    v.x.to_ne_bytes(),
-                                    v.y.to_ne_bytes(),
-                                    v.z.to_ne_bytes(),
-                                    v.w.to_ne_bytes(),
-                                ]
-                            })
-                            .flatten()
-                            .flatten()
-                            .collect::<Vec<u8>>(),
-                        TextureFormat::Rgba32Float,
-                    )),
-                ),
-                texture_dimensions: vec3(resf, resf, resf),
-                alpha_mode: AlphaMode::Blend,
-                color: Color::rgba(1., 1., 1., 1.),
-                ..default()
-            }),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+        let res = [250; 3];
+        let sdf_data = cloud_gen::new(res)
+            .iter()
+            .flatten()
+            .flatten()
+            .map(|v| [v.x.to_ne_bytes(), v.y.to_ne_bytes()])
+            .flatten()
+            .flatten()
+            .collect::<Vec<u8>>();
+        let texture = images.add(Image::new(
+            Extent3d {
+                width: res[0] as u32,
+                height: res[1] as u32,
+                depth_or_array_layers: res[2] as u32,
+            },
+            TextureDimension::D3,
+            sdf_data,
+            TextureFormat::Rg32Float,
+        ));
+        let material = cloud_materials.add(CloudMaterial {
+            sdf: Some(texture.clone()),
+            texture_dimensions: vec3(res[0] as f32, res[1] as f32, res[2] as f32),
+            sun_direction: vec3(1., 1., 0.).normalize(),
+            alpha_mode: AlphaMode::Blend,
             ..default()
-        })
+        });
+
+        commands.spawn((
+            Cloud {
+                handle: material.clone(),
+            },
+            MaterialMeshBundle {
+                // mesh: meshes.add(cloud_gen::new(100.)),
+                mesh: meshes.add(shape::Box::new(1., 1., 1.).into()),
+                material,
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                ..default()
+            },
+        ));
     };
 
     // ambient light
@@ -154,7 +179,10 @@ fn setup(
             // tonemapping: bevy::core_pipeline::tonemapping::Tonemapping::AcesFitted,
             ..default()
         },
-        BloomSettings { ..default() },
+        BloomSettings {
+            intensity: 0.5,
+            ..default()
+        },
     ));
     camera.insert(CameraController::default());
     camera.insert(FlyCamera {

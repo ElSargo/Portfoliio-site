@@ -1,96 +1,120 @@
-use std::ops::{Add, Mul};
-
 use crate::noise::noise;
 use crate::sdf::sdf as cloud_sdf;
-use bevy::math::{vec3, vec4};
-use bevy::prelude::{Vec3, Vec4};
+use bevy::math::{vec2, vec3, vec4};
+use bevy::prelude::{Mat3, Vec2, Vec3};
 
 // A 16^3 chunk with 1-voxel boundary padding.
 
 // This chunk will cover just a single octant of a sphere SDF (radius 15).
-pub fn new(res: f32) -> Vec<Vec4> {
-    assert_eq!(linearize(100, [4, 0, 0]), 4);
-    assert_eq!(linearize(100, [4, 1, 0]), 104);
-    assert_eq!(linearize(100, [4, 1, 1]), 10104);
+pub fn new(buffer_dimensions: [usize; 3]) -> Vec<Vec<Vec<Vec2>>> {
+    let resolution = vec3(
+        buffer_dimensions[0] as f32,
+        buffer_dimensions[1] as f32,
+        buffer_dimensions[2] as f32,
+    );
 
-    assert_eq!(delinearize(100, 4), [4, 0, 0]);
-    assert_eq!(delinearize(100, 104), [4, 1, 0]);
-    assert_eq!(delinearize(100, 10104,), [4, 1, 1]);
-
-    assert_eq!(linearize(100, [0, 50, 0]), 50 * 100);
-    assert_eq!(delinearize(100, 50 * 100), [0, 50, 0]);
-
-    let buffer_side_length = res as usize;
-    let buffer_size = buffer_side_length.pow(3);
-    let mut sdf = vec![vec4(1., 1., 1., 1.); buffer_size];
-    for (i, [x, y, z]) in (0..buffer_size).map(|i| (i, delinearize(buffer_side_length, i))) {
-        let p = coord_to_pos([x, y, z], res);
-        let d = cloud_sdf(p);
-        let n = noise(p * 1.);
-        let n2 = noise(p * 2.);
-        // println!("{p}, {d}");
-        sdf[i] = vec4(d, n, 0., n2);
+    let mut data = vec![
+        vec![vec![vec2(1., 1.); buffer_dimensions[2]]; buffer_dimensions[1]];
+        buffer_dimensions[0]
+    ];
+    for x in 0..buffer_dimensions[0] {
+        for y in 0..buffer_dimensions[1] {
+            for z in 0..buffer_dimensions[2] {
+                let p = coord_to_pos([x, y, z], resolution);
+                let d = cloud_sdf(p);
+                data[x][y][z] = vec2(if d > 0.0 { d } else { -noise(p).abs() }, 0.);
+            }
+        }
     }
     // Sun light info requires sdf and density info
 
-    println!("Marching");
-    for (i, [x, y, z]) in (0..buffer_size).map(|i| (i, delinearize(buffer_side_length, i))) {
-        //                     y
-        let sun_base = vec3(1., 0., 1.).normalize();
-        // March to the sun
-        let mut total = 0.;
-        let dt = 2. / res;
-        for sun in [
-            sun_base.add(vec3(0.1, 0., 0.1)).normalize(),
-            sun_base.add(vec3(-0.1, 0., 0.1)).normalize(),
-            sun_base.add(vec3(0.1, 0., -0.1)).normalize(),
-            sun_base.add(vec3(-0.1, 0., -0.1)).normalize(),
-            sun_base,
-        ] {
-            let mut t = 1.;
-            let mut p = coord_to_pos([x, y, z], res);
-            while let Some(samp) = sdf.get(linearize(buffer_side_length, pos_to_coord(p, res))) {
-                if p.x.abs() > 1. || p.y.abs() > 1. || p.z.abs() > 1. {
-                    break;
-                }
-                if i == 1 {
-                    println! {"{:?} [:] {t} [:] {:?}",p,pos_to_coord(p, res)};
-                }
-                let distance = samp.x;
-                let noise = mix(0_f32.max(samp.y + samp.w), 1., 0.5);
-                if distance < 0.05 + noise * 0.1 {
-                    t *= (noise * -7. * dt).min(0.).exp();
-                }
-                p += sun * dt;
+    let sun_base = vec3(0., 1., 1.).normalize();
+
+    let mut sun_directions = Vec::with_capacity(27);
+    // sun_directions.push((sun_base, mie(1.)));
+    let theta = 0.15;
+    let angles = [-theta, 0.0, theta];
+    for x in angles {
+        for y in angles {
+            for z in angles {
+                let direction = rotate(sun_base, x, y, z);
+                sun_directions.push((direction, mie(sun_base.dot(direction))));
             }
-            total += t;
         }
-        sdf[i].z = total * 0.2;
     }
-    sdf
+    for x in 0..buffer_dimensions[0] {
+        for y in 0..buffer_dimensions[1] {
+            for z in 0..buffer_dimensions[2] {
+                let mut total = 0.;
+                let dt = 2. / resolution.x.min(resolution.y).min(resolution.z);
+                for (sun_direction, phase) in sun_directions.iter() {
+                    let mut t = 1.;
+                    let mut p = coord_to_pos([x, y, z], resolution);
+                    let mut sample_point = [x, y, z];
+                    while let Some(samp) = data
+                        .get(sample_point[0])
+                        .and_then(|slice| slice.get(sample_point[1]))
+                        .and_then(|row| row.get(sample_point[2]))
+                    {
+                        if p.x.abs() > 1. || p.y.abs() > 1. || p.z.abs() > 1. {
+                            break;
+                        }
+
+                        let distance = samp.x;
+                        // let noise = mix(0_f32.max(samp.y + samp.w), 1., 0.5);
+                        if distance < 0.0 {
+                            t *= (-20. * dt * -distance).min(0.).exp();
+                        }
+                        p += *sun_direction * dt * *phase;
+                        sample_point = pos_to_coord(p, resolution);
+                    }
+                    total += t;
+                }
+                data[x][y][z].y = total / sun_directions.len() as f32;
+            }
+        }
+    }
+    data
 }
 
-fn mix(a: f32, b: f32, t: f32) -> f32 {
-    a * (1. - t) + b * t
+#[allow(dead_code)]
+fn rotate(v: Vec3, x: f32, y: f32, z: f32) -> Vec3 {
+    Mat3::from_euler(bevy::prelude::EulerRot::XYZ, x, y, z) * v
 }
 
-fn linearize(buffer_side_length: usize, [x, y, z]: [usize; 3]) -> usize {
-    x + buffer_side_length.mul(y) + (buffer_side_length * buffer_side_length).mul(z)
+fn mie(costh: f32) -> f32 {
+    // This function was optimized to minimize (delta*delta)/reference in order to capture
+    // the low intensity behavior.
+    let params = [
+        9.805233e-06,
+        -6.500000e+01,
+        -5.500000e+01,
+        8.194068e-01,
+        1.388198e-01,
+        -8.370334e+01,
+        7.810083e+00,
+        2.054747e-03,
+        2.600563e-02,
+        -4.552125e-12,
+    ];
+
+    let p1 = costh + params[3];
+    let exp_values = vec4(
+        params[1] * costh + params[2],
+        params[5] * p1 * p1,
+        params[6] * costh,
+        params[9] * costh,
+    )
+    .exp();
+    let exp_val_weight = vec4(params[0], params[4], params[7], params[8]);
+    return exp_values.dot(exp_val_weight) * 0.25;
 }
 
-fn delinearize(buffer_side_length: usize, mut i: usize) -> [usize; 3] {
-    let z = i / (buffer_side_length * buffer_side_length);
-    i -= z * (buffer_side_length * buffer_side_length);
-    let y = i / buffer_side_length;
-    let x = i % buffer_side_length;
-    [x, y, z]
-}
-
-fn coord_to_pos<T: AsF32 + Copy>(coord: [T; 3], res: f32) -> Vec3 {
+fn coord_to_pos<T: AsF32 + Copy>(coord: [T; 3], res: Vec3) -> Vec3 {
     (vec3(coord[0].as_f32(), coord[1].as_f32(), coord[2].as_f32()) / res - 0.5) * 2.
 }
 
-fn pos_to_coord(p: Vec3, res: f32) -> [usize; 3] {
+fn pos_to_coord(p: Vec3, res: Vec3) -> [usize; 3] {
     let c = ((p / 2.) + 0.5) * res;
     [
         c.x.round() as usize,

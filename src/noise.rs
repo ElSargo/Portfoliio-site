@@ -30,14 +30,14 @@ fn gradient_noise(x: Vec3, freq: f32) -> f32 {
     let u = w * w * w * (w * (w * 6. - 15.) + 10.);
 
     // gradients
-    let ga = hash33(p + vec3(0., 0., 0.) % freq);
-    let gb = hash33(p + vec3(1., 0., 0.) % freq);
-    let gc = hash33(p + vec3(0., 1., 0.) % freq);
-    let gd = hash33(p + vec3(1., 1., 0.) % freq);
-    let ge = hash33(p + vec3(0., 0., 1.) % freq);
-    let gf = hash33(p + vec3(1., 0., 1.) % freq);
-    let gg = hash33(p + vec3(0., 1., 1.) % freq);
-    let gh = hash33(p + vec3(1., 1., 1.) % freq);
+    let ga = hash33(p + vec3(0., 0., 0.));
+    let gb = hash33(p + vec3(1., 0., 0.));
+    let gc = hash33(p + vec3(0., 1., 0.));
+    let gd = hash33(p + vec3(1., 1., 0.));
+    let ge = hash33(p + vec3(0., 0., 1.));
+    let gf = hash33(p + vec3(1., 0., 1.));
+    let gg = hash33(p + vec3(0., 1., 1.));
+    let gh = hash33(p + vec3(1., 1., 1.));
 
     // projections
     let va = ga.dot(w - vec3(0., 0., 0.));
@@ -128,7 +128,8 @@ fn mix(a: f32, b: f32, t: f32) -> f32 {
 }
 
 pub fn noise(p: Vec3) -> f32 {
-    let n = noise_helper(p);
+    let warp = gradient_noise(p, 1.);
+    let n = noise_helper(p + warp);
 
     let perlin_worley = n.x;
 
