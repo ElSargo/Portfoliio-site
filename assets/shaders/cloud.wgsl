@@ -7,15 +7,16 @@ struct CustomMaterial {
     time: f32,
 };
 
-fn Rayleigh(costh: f32) -> f32 {
+fn rayleigh(costh: f32) -> f32 {
     return 3.0 / (16.0 * 3.14159265358979323846) * (1.0 + costh * costh);
 }
 
-fn rayleigh(theta: f32, lambda: f32) -> f32 {
+fn HenyeyGreenstein(g: f32, costh: f32) -> f32
+{
     let pi = 3.1415926535897932384626433;
-    let Kr = 0.5 * pi * pi * pow(1.00029 * 1.00029 - 1., 2.) / 2.5e+25;
-    return Kr * (1. + pow(cos(theta), 2.)) / pow(lambda, 4.);
+    return (1.0 - g * g) / (4.0 * pi * pow(1.0 + g*g - 2.0*g*costh, 1.5));
 }
+
 
 fn mie(costh: f32) -> f32 {
     // This function was optimized to minimize (delta*delta)/reference in order to capture
@@ -95,11 +96,12 @@ fn fast_ne_exp(x: f32) -> f32 {
 
 fn powder(x: f32) -> f32 {
     let a = x * 0.2 - 1.; // nearly exp(-x)
-    let b = a * a; // pow 2
-    let c = b * b; // pow 4
-    let d = c * c; // pow 8
-    let e = d * d; // pow 16
-    return c - e * e;
+    let b = a * a; // 
+    let c = b * b; // Base
+    let d = c * c; // pow 2
+    let e = d * d; // pow 4
+    let f = e * e; // pow 8
+    return d - f*f;
 }
 
 @fragment
@@ -108,7 +110,7 @@ fn fragment(
 ) -> @location(0) vec4<f32> {
     let ro = material.camera_position - material.aabb_position;
     let rd = normalize(world_position.xyz - material.camera_position);
-    let sun_dir = normalize(vec3(1., 1., 0.));
+    let sun_dir = normalize(vec3(1., .3, -1.));
     let mei = mie(dot(rd, sun_dir));
     let inv_sca = 1./material.scale;
     let mo = ro +0.5*material.scale;
@@ -118,28 +120,29 @@ fn fragment(
     var light = vec3(0.);
     var absorbtion = 0.;
     let intersection = boxIntersection(ro, rd, vec3(0.5)*material.scale);
-    var i = max(intersection.x, 0.) + hash13(vec3(uv * 913.123, material.time )) * .04;
-    for (; i < intersection.y; i += dt * 100.) {
-        let transmission = powder(absorbtion);
-        if absorbtion > 2. {
+    var i = max(intersection.x, 0.) + hash13(vec3(uv * 913.123, material.time )) * 10.;
+    for (; i < intersection.y; i += dt*100.) {
+        if absorbtion > 4. {
             absorbtion = 6.;
             break;
         }
         steps += 1.;
         p = mo + i * rd;
         let samp = sdf(p*inv_sca );
-        let d = samp.x;
+        let d = samp.x - 0.03;
         if d < 0.0 {
-            let dens = mix(-d,1.,0.5);
-            absorbtion += dt * 10. * dens;
-            let direct = (samp.y * (mei+.5) * 300.) * 1.  ;
-            let scattered =   3. ;
-            light += (direct + scattered ) * transmission * dt  * dens;
+            let dens = abs(samp.z*2.);
+            // let dens = 1.;
+            absorbtion += dt * 20. * dens ;
+            let transmission = fast_ne_exp(absorbtion);
+            let direct = samp.y * 10.;
+            let scater = 40. * vec3(0.6,0.8,1.) ;
+            light += (direct + scater) * transmission * dt   ;
         }
-        dt = max(samp.x  , 0.01);
+        dt = max(abs(samp.x)  , 0.1);
     }
 
-    // return vec4( vec3(1. - fast_ne_exp(absorbtion)),1.);
+    // return vec4( vec3(mie(dot(sun_dir,rd))),1.);
     return vec4(light, 1. - fast_ne_exp(absorbtion));
     // return vec4( vec3(steps*0.01),1.);
     // return vec4(
