@@ -71,13 +71,15 @@ pub fn setup(
                 let mut data = Box::new([[0.0; DIM]; DIM]);
                 for x in 0..DIM {
                     for y in 0..DIM {
-                        let n = noise::noise(
+                        let n = noise::noised(
                             Vec3 {
                                 x: x as f32,
                                 y: y as f32,
                                 z: 1.,
                             } / 200.,
-                        );
+                            Vec3::ONE * 100000.,
+                        )
+                        .x;
                         data[x][y] = n;
                         // println!("{n}");
                     }
@@ -108,6 +110,7 @@ pub fn setup(
                                     y: y as f32,
                                     z: z as f32,
                                 } / 10.,
+                                Vec3::ONE * 100000.,
                             );
                         }
                     }

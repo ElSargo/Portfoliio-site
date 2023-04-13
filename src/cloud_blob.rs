@@ -7,7 +7,7 @@ use bevy::{
 use rand::prelude::*;
 use std::ops::{Add, Mul, Sub};
 
-use crate::{noise, rm_cloud::coord_to_pos, CameraController};
+use crate::{noise, CameraController};
 
 #[derive(Component, Default)]
 struct CloudBlob {
@@ -41,50 +41,57 @@ impl Plugin for CloudBlobPlugin {
 
         const SECTORS: usize = 10;
         const STACKS: usize = 10;
-        const texture_res: usize = 50;
+        const TEXTURE_RES: usize = 200;
         app.add_startup_system(
             |mut materials: ResMut<Assets<CloudBlobMaterial>>,
              mut commands: Commands,
              mut meshes: ResMut<Assets<Mesh>>,
              mut images: ResMut<Assets<Image>>| {
-                let mut noise_data = Box::new([[[0.0; texture_res]; texture_res]; texture_res]);
-                for x in 0..texture_res {
-                    for y in 0..texture_res {
-                        for z in 0..texture_res {
-                            noise_data[x][y][z] = noise::noise(
-                                coord_to_pos(
-                                    [x, y, z],
-                                    Vec3 {
-                                        x: texture_res as f32,
-                                        y: texture_res as f32,
-                                        z: texture_res as f32,
-                                    },
-                                ) / texture_res as f32
-                                    * 6.,
-                            )
+                let path = "assets/noise_data";
+                let data = match std::fs::read(path) {
+                    Ok(data) => data,
+                    Err(_) => {
+                        let mut data = Box::new([[[0.0; TEXTURE_RES]; TEXTURE_RES]; TEXTURE_RES]);
+                        for x in 0..TEXTURE_RES {
+                            for y in 0..TEXTURE_RES {
+                                for z in 0..TEXTURE_RES {
+                                    let sample_pos = vec3(
+                                        x as f32 / TEXTURE_RES as f32,
+                                        y as f32 / TEXTURE_RES as f32,
+                                        z as f32 / TEXTURE_RES as f32,
+                                    ) * 10.;
+                                    data[x][y][z] = mix(
+                                        noise::fbmd(sample_pos, Vec3::ONE * 1.).x,
+                                        noise::wfbm(sample_pos * 0.5, Vec3::ONE * 1.),
+                                        0.4,
+                                    )
+                                }
+                            }
                         }
+                        let data = data
+                            .iter()
+                            .flatten()
+                            .flatten()
+                            .map(|f| f.to_ne_bytes())
+                            .flatten()
+                            .collect();
+                        if let Err(e) = std::fs::write(path, &data) {
+                            println!("Error writing noise data {:?}", e);
+                        }
+                        data
                     }
-                }
+                };
+
                 let texture = images.add(Image::new(
                     bevy::render::render_resource::Extent3d {
-                        width: texture_res as u32,
-                        height: texture_res as u32,
-                        depth_or_array_layers: texture_res as u32,
+                        width: TEXTURE_RES as u32,
+                        height: TEXTURE_RES as u32,
+                        depth_or_array_layers: TEXTURE_RES as u32,
                     },
                     bevy::render::render_resource::TextureDimension::D3,
-                    noise_data
-                        .iter()
-                        .flatten()
-                        .flatten()
-                        .map(|f| f.to_ne_bytes())
-                        .flatten()
-                        .collect(),
+                    data,
                     TextureFormat::R32Float,
                 ));
-                let material = materials.add(CloudBlobMaterial {
-                    noise: Some(texture),
-                    ..default()
-                });
                 let mesh = meshes.add(
                     shape::UVSphere {
                         radius: 1.0,
@@ -93,42 +100,68 @@ impl Plugin for CloudBlobPlugin {
                     }
                     .into(),
                 );
-                commands.spawn((
-                    CloudBlob {
-                        handle: material.clone(),
-                    },
-                    MaterialMeshBundle {
-                        mesh: mesh.clone(),
-                        transform: Transform::from_xyz(250., 1000., 400.)
-                            .with_scale(vec3(400., 200., 400.)),
-                        material: material.clone(),
-                        ..default()
-                    },
-                ));
                 let mut rng = thread_rng();
-                for _ in 0..300 {
+                for _ in 0..50 {
                     let xz =
                         vec2(rng.gen(), rng.gen()).add(vec2(-0.5, -0.5)) * vec2(10000., 10000.);
                     let y = (10_000. - xz.length()).sqrt().sub(10.).mul(10.);
                     let pos = vec3(xz.x, y, xz.y);
-                    for _ in 0..1 {
-                        let offset = (vec3(rng.gen(), rng.gen(), rng.gen()) - 0.5) * 400.;
-                        commands.spawn((MaterialMeshBundle {
-                            mesh: mesh.clone(),
-                            material: material.clone(),
-                            transform: Transform::from_xyz(
-                                pos.x + offset.x,
-                                pos.y + offset.y,
-                                pos.z + offset.z,
-                            )
-                            .with_scale(vec3(800., 400., 800.) * rng.gen::<f32>()),
+                    for (scale, offset) in [
+                        (
+                            vec3(1000., 400., 1000.) * rng.gen_range(0.5..1.0),
+                            vec3(0., 0., 0.),
+                        ),
+                        (
+                            vec3(400., 400., 400.) * rng.gen_range(0.75..1.0),
+                            vec3(0., 200., 0.),
+                        ),
+                        (
+                            vec3(200., 200., 200.) * rng.gen_range(0.5..1.0),
+                            vec3(200., 50., 200.) * rng.gen_range(0.75..1.0),
+                        ),
+                        (
+                            vec3(200., 200., 200.) * rng.gen_range(0.5..1.0),
+                            vec3(200., 50., -200.) * rng.gen_range(0.75..1.0),
+                        ),
+                        (
+                            vec3(200., 200., 200.) * rng.gen_range(0.5..1.0),
+                            vec3(-200., 50., 200.) * rng.gen_range(0.75..1.0),
+                        ),
+                        (
+                            vec3(200., 200., 200.) * rng.gen_range(0.5..1.0),
+                            vec3(-200., 50., -200.) * rng.gen_range(0.75..1.0),
+                        ),
+                    ] {
+                        // let offset = (vec3(rng.gen(), rng.gen(), rng.gen()) - 0.5) * 400.;
+                        let material = materials.add(CloudBlobMaterial {
+                            noise: Some(texture.clone()),
                             ..default()
-                        },));
+                        });
+                        commands.spawn((
+                            CloudBlob {
+                                handle: material.clone(),
+                            },
+                            MaterialMeshBundle {
+                                mesh: mesh.clone(),
+                                material,
+                                transform: Transform::from_xyz(
+                                    pos.x + offset.x,
+                                    pos.y + offset.y,
+                                    pos.z + offset.z,
+                                )
+                                .with_scale(scale),
+                                ..default()
+                            },
+                        ));
                     }
                 }
             },
         );
     }
+}
+
+fn mix(a: f32, b: f32, t: f32) -> f32 {
+    a * (1. - t) + b * t
 }
 
 #[derive(AsBindGroup, TypeUuid, Debug, Clone, Default, Reflect)]

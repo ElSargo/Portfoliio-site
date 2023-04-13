@@ -118,7 +118,7 @@ pub fn new_cloud_data(buffer_dimensions: [usize; 3]) -> Vec<Vec<Vec<Vec4>>> {
             for z in 0..buffer_dimensions[2] {
                 let p = coord_to_pos([x, y, z], resolution);
                 let d = cloud_sdf(p);
-                let n = noise::gradient_fbm(p, 10., 10);
+                let n = noise::fbmd(p, Vec3::ONE * 1000.).x;
                 data[x][y][z] = vec4(d, 0., n, 0.);
             }
         }
