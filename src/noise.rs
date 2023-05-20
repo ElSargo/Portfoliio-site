@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use bevy::math::Vec4Swizzles;
 use bevy::{
     math::{mat2, mat3, vec2, vec3, vec4, Vec3Swizzles},
     prelude::{Mat2, Mat3, Vec3, Vec4},
@@ -77,7 +76,7 @@ fn remap(x: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
     return (((x - a) / (b - a)) * (d - c)) + c;
 }
 
-pub fn noised(x: Vec3, f: Vec3) -> Vec4 {
+pub fn noised(x: Vec3) -> Vec4 {
     let i = x.floor();
     let w = x.fract();
     // cubic interpolation
@@ -121,14 +120,14 @@ pub fn noised(x: Vec3, f: Vec3) -> Vec4 {
     );
 }
 
-pub fn fbmd(mut p: Vec3, f: Vec3) -> Vec4 {
+pub fn fbmd(mut p: Vec3) -> Vec4 {
     let mut t = Vec4::ZERO;
     let mut s = 1.;
     let mut c = 1.;
 
     for i in 0..11 {
         p += vec3(13.123, -72., 234.23);
-        let n = noised(p * s, f) * c;
+        let n = noised(p * s) * c;
         t.x += n.x;
         if i < 1 {
             t.y += n.y;

@@ -1,16 +1,23 @@
+
+
+orbital scene
+
 use bevy::{core_pipeline::bloom::BloomSettings, math::vec3, prelude::*};
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use cloud_blob::CloudBlobPlugin;
 use skybox::{CubemapMaterial, SkyBoxPlugin};
+use water::WaterPlugin;
 mod camera;
 mod cloud_blob;
+mod fin_cloud;
 mod noise;
 mod noise_shader;
 mod rm_cloud;
 mod sdf;
 mod skybox;
 mod test_cloud_shader;
+mod water;
 
 fn main() {
     App::new()
@@ -19,8 +26,10 @@ fn main() {
             ..Default::default()
         }))
         .add_plugin(WorldInspectorPlugin::new())
-        // .add_plugin(RMCloudPlugin)
+        // .add_plugin(rm_cloud::RMCloudPlugin)
+        .add_plugin(fin_cloud::FinCloudPlugin)
         .add_plugin(CloudBlobPlugin)
+        // .add_plugin(WaterPlugin)
         .add_startup_system(setup)
         .add_plugin(FlyCameraPlugin)
         .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
@@ -31,8 +40,7 @@ fn main() {
 }
 
 #[derive(Component, Default)]
-struct CameraController {}
-
+pub struct CameraController {}
 fn setup(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -70,7 +78,11 @@ fn setup(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0., 0., 0.).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(0., 10., -10.).looking_at(Vec3::ZERO, Vec3::Y),
+            projection: Projection::Perspective(PerspectiveProjection {
+                far: 100_000.,
+                ..default()
+            }),
             camera: Camera {
                 hdr: true,
                 ..default()
@@ -83,9 +95,6 @@ fn setup(
             ..default()
         },
         CameraController::default(),
-        FlyCamera {
-            sensitivity: 10.,
-            ..default()
-        },
+        FlyCamera { ..default() },
     ));
 }

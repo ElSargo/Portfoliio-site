@@ -16,7 +16,7 @@ use bevy::{
     },
 };
 
-use crate::noise;
+use crate::{noise, CameraController};
 
 pub struct SkyBoxPlugin {}
 
@@ -77,7 +77,6 @@ pub fn setup(
                                 y: y as f32,
                                 z: 1.,
                             } / 200.,
-                            Vec3::ONE * 100000.,
                         )
                         .x;
                         data[x][y] = n;
@@ -220,17 +219,22 @@ pub fn animate_sky(
     time: Res<Time>,
     mut cubemap_materials: ResMut<Assets<CubemapMaterial>>,
     sun: Query<&Transform, With<DirectionalLight>>,
+    camera: Query<&Transform, With<CameraController>>,
 ) {
     let sun_direction = sun.single().forward();
+    let cam_pos = camera.single().translation;
     for material in cubemap_materials.iter_mut() {
         material.1.time = time.elapsed_seconds();
         material.1.sun_direction = sun_direction;
+        material.1.camera_positon = cam_pos;
     }
 }
 
 #[derive(AsBindGroup, Debug, Clone, TypeUuid, Default, PartialEq)]
 #[uuid = "9509a0f8-3c05-48ee-a13e-a93226c7f488"]
 pub struct CubemapMaterial {
+    #[uniform(0)]
+    camera_positon: Vec3,
     #[uniform(0)]
     sun_direction: Vec3,
     #[uniform(0)]
@@ -246,7 +250,7 @@ pub struct CubemapMaterial {
 
 impl Material for CubemapMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/cubemap_unlit.wgsl".into()
+        "shaders/skybox.wgsl".into()
     }
 
     fn specialize(

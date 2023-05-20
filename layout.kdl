@@ -1,0 +1,49 @@
+layout {
+	tab focus=true name="Editor"{
+	    pane split_direction="vertical" borderless=true edit="src/main.rs" {
+	    }
+	}
+	tab name="Run"{
+		pane split_direction="vertical"{ 
+			pane command="cargo" start_suspended=true {
+				args "run" "--features" "bevy/dynamic_linking"
+			}
+			pane command="cargo" start_suspended=true {
+				args "run" "--release"
+			}
+		}	    
+		
+	}
+	tab name="Git"{
+		pane command="gitui"
+	}
+	tab name="Files"{
+		pane command="lf"
+	}
+	default_tab_template {
+		children
+	    pane size=1 borderless=true {
+	        plugin location="zellij:compact-bar"
+	    }
+		
+	}
+}
+keybinds {
+    shared {
+        // bind "Alt r" { GoToTab 2 ; Run "cargo" "run" ; FocusPreviousPane ; }
+        bind "Alt r" {
+			GoToTab 2 ;
+			Run "cargo" "run" ;
+			FocusPreviousPane ;
+			CloseFocus ;
+			GoToTab 1 
+		}
+        bind "Alt R" {
+			GoToTab 2 ;
+			Run "cargo" "run" "--release" ;
+			FocusPreviousPane ;
+			CloseFocus ;
+			GoToTab 1 
+		}
+    }
+}

@@ -61,9 +61,9 @@ impl Plugin for CloudBlobPlugin {
                                         z as f32 / TEXTURE_RES as f32,
                                     ) * 10.;
                                     data[x][y][z] = mix(
-                                        noise::fbmd(sample_pos, Vec3::ONE * 1.).x,
-                                        noise::wfbm(sample_pos * 0.5, Vec3::ONE * 1.),
-                                        0.4,
+                                        noise::fbmd(sample_pos).x,
+                                        noise::wfbm(sample_pos * 0.5, Vec3::ONE * 100.),
+                                        0.7,
                                     )
                                 }
                             }
@@ -72,8 +72,7 @@ impl Plugin for CloudBlobPlugin {
                             .iter()
                             .flatten()
                             .flatten()
-                            .map(|f| f.to_ne_bytes())
-                            .flatten()
+                            .flat_map(|f| f.to_ne_bytes())
                             .collect();
                         if let Err(e) = std::fs::write(path, &data) {
                             println!("Error writing noise data {:?}", e);
@@ -101,7 +100,30 @@ impl Plugin for CloudBlobPlugin {
                     .into(),
                 );
                 let mut rng = thread_rng();
-                for _ in 0..50 {
+                for _ in 0..200 {
+                    let xz =
+                        vec2(rng.gen(), rng.gen()).add(vec2(-0.5, -0.5)) * vec2(10000., 10000.);
+                    let y = (10_000. - xz.length()).sqrt().sub(10.).mul(10.);
+                    let pos = vec3(xz.x, y, xz.y);
+
+                    let material = materials.add(CloudBlobMaterial {
+                        noise: Some(texture.clone()),
+                        ..default()
+                    });
+                    commands.spawn((
+                        CloudBlob {
+                            handle: material.clone(),
+                        },
+                        MaterialMeshBundle {
+                            mesh: mesh.clone(),
+                            material,
+                            transform: Transform::from_xyz(pos.x, pos.y, pos.z)
+                                .with_scale(vec3(400., 300., 400.) * rng.gen_range(0.5..1.0)),
+                            ..default()
+                        },
+                    ));
+                }
+                for _ in 0..20 {
                     let xz =
                         vec2(rng.gen(), rng.gen()).add(vec2(-0.5, -0.5)) * vec2(10000., 10000.);
                     let y = (10_000. - xz.length()).sqrt().sub(10.).mul(10.);
@@ -186,6 +208,6 @@ impl Material for CloudBlobMaterial {
     }
 
     fn alpha_mode(&self) -> AlphaMode {
-        AlphaMode::Blend
+        AlphaMode::Premultiplied
     }
 }

@@ -120,7 +120,7 @@ fn fragment(
     var light = vec3(0.);
     var absorbtion = 0.;
     let intersection = boxIntersection(ro, rd, vec3(0.5)*material.scale);
-    var i = max(intersection.x, 0.) + hash13(vec3(uv * 913.123, material.time )) * 10.;
+    var i = max(intersection.x, 0.) + hash13(vec3(uv * 913.123, material.time )) * 1.;
     for (; i < intersection.y; i += dt*100.) {
         if absorbtion > 4. {
             absorbtion = 6.;
@@ -139,7 +139,7 @@ fn fragment(
             let scater = 40. * vec3(0.6,0.8,1.) ;
             light += (direct + scater) * transmission * dt   ;
         }
-        dt = max(abs(samp.x)  , 0.1);
+        dt = max(abs(samp.x)  , 0.01);
     }
 
     // return vec4( vec3(mie(dot(sun_dir,rd))),1.);
