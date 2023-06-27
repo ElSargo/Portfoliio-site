@@ -48,7 +48,7 @@ fn fragment(
     let egde_signal = smoothstep(0.7, 0.99, shallow);
     let blobyness = pow(almost_identity(directional_derivative * egde_signal, .1, 0.05), .4);
     let color = mix(
-        (sun_color + blobyness * 4. + mie_signal*sun_color) * (0.4 + smoothstep(-1., -0., normal.y)),
+        (sun_color + blobyness * 4. + mie_signal*sun_color) * (0.6 + smoothstep(-1., -0., normal.y)),
         (shadow_color + blobyness * vec3(0.5, 0.6, 0.7) - mie_signal * 0.2),
         min(smoothstep(1., -1., dot(sun_dir, normal)), egde_signal)
     );

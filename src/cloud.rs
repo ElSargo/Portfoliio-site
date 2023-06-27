@@ -1,9 +1,7 @@
 use antidote::Mutex;
-use std::cell::Cell;
-use std::f32::consts::E;
+use bevy::math::vec2;
 
 use crate::noise::fbmd;
-use crate::sdf::sdf as cloud_sdf;
 use crate::{noise, CameraController};
 use bevy::{
     math::{vec3, vec4},
@@ -14,28 +12,54 @@ use bevy::{
 use itertools::Itertools;
 use rayon::prelude::*;
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Reflect)]
 struct RMCloud {
-    handle: Handle<RMCloudMaterial>,
+    pub handle: Handle<RMCloudMaterial>,
+    pub shadow_dist: f32,
+    pub shadow_coef: f32,
+    pub worley_factor: f32,
+    pub value_factor: f32,
+    pub cloud_coef: f32,
+    pub cloud_height: f32,
 }
 
 pub struct RMCloudPlugin;
 impl Plugin for RMCloudPlugin {
     fn build(&self, app: &mut App) {
+        app.register_type::<RMCloud>();
         app.add_plugin(MaterialPlugin::<RMCloudMaterial>::default());
         app.add_system(
             |cam: Query<&Transform, With<CameraController>>,
              clouds: Query<(&RMCloud, &Transform)>,
+             sun: Query<&Transform, With<DirectionalLight>>,
              mut cloud_materials: ResMut<Assets<RMCloudMaterial>>,
              time: Res<Time>| {
                 let camera_position = cam.get_single().unwrap().translation;
+                let sun_dir = sun.get_single().unwrap().forward();
                 for (cloud, transform) in &clouds {
                     if let Some(material) = cloud_materials.get_mut(&cloud.handle) {
                         material.camera_position = camera_position;
                         material.time = time.raw_elapsed_seconds();
-                        material.aabb_position = transform.translation;
-                        material.scale = transform.scale;
+                        material.sun_direction = sun_dir;
                     }
+                }
+            },
+        );
+
+        app.add_system(
+            |mut clouds: Query<&mut RMCloud>, mut materials: ResMut<Assets<RMCloudMaterial>>| {
+                for cloud in clouds.iter_mut() {
+                    match materials.get_mut(&cloud.handle) {
+                        Some(material) => {
+                            material.shadow_dist = cloud.shadow_dist;
+                            material.shadow_coef = cloud.shadow_coef;
+                            material.worley_factor = cloud.worley_factor;
+                            material.value_factor = cloud.value_factor;
+                            material.cloud_coef = cloud.cloud_coef;
+                            material.cloud_height = cloud.cloud_height;
+                        }
+                        None => {}
+                    };
                 }
             },
         );
@@ -48,66 +72,120 @@ impl Plugin for RMCloudPlugin {
              mut cloud_materials: ResMut<Assets<RMCloudMaterial>>,
              // mut noise_materials: ResMut<Assets<NoiseMaterial>>,
              mut images: ResMut<Assets<Image>>| {
-                {
-                    let res = [1000, 1, 1000];
-                    let resf = vec3(res[0] as f32, res[1] as f32, res[2] as f32);
+                let res = (1000, 1000);
+                let re3 = 128;
 
-                    let sdf_data = new_cloud_data(res)
-                        .iter()
-                        .map(|v| {
-                            [
-                                v.x.to_ne_bytes(),
-                                v.y.to_ne_bytes(),
-                                v.z.to_ne_bytes(),
-                                v.w.to_ne_bytes(),
-                            ]
-                        })
-                        .flatten()
-                        .flatten()
-                        .collect::<Vec<u8>>();
-                    let texture = images.add(Image::new(
+                let w3d = {
+                    images.add(Image::new(
                         Extent3d {
-                            width: res[0] as u32,
-                            height: res[1] as u32,
-                            depth_or_array_layers: res[2] as u32,
+                            width: re3 as u32,
+                            height: re3 as u32,
+                            depth_or_array_layers: re3 as u32,
                         },
                         TextureDimension::D3,
-                        sdf_data,
-                        TextureFormat::Rgba32Float,
-                    ));
-                    let material = cloud_materials.add(RMCloudMaterial {
-                        sdf: Some(texture.clone()),
-                        texture_dimensions: vec3(res[0] as f32, res[1] as f32, res[2] as f32),
-                        sun_direction: vec3(1., 1., 0.).normalize(),
-                        ..default()
-                    });
-
-                    commands.spawn((
-                        RMCloud {
-                            handle: material.clone(),
-                        },
-                        MaterialMeshBundle {
-                            // mesh: meshes.add(cloud_gen::new(100.)),
-                            mesh: meshes.add(shape::Box::new(1., 1., 1.).into()),
-                            material,
-                            transform: {
-                                let mut t = Transform::from_xyz(100.0, 100.0, 200.0);
-                                t.scale = resf;
-                                t
-                            },
-
-                            ..default()
-                        },
-                    ));
+                        w3noise(re3)
+                            .iter()
+                            .flat_map(|f| f.to_ne_bytes())
+                            .collect::<Vec<u8>>(),
+                        TextureFormat::R32Float,
+                    ))
                 };
+
+                let mut make_image = |data: &[f32]| {
+                    images.add(Image::new(
+                        Extent3d {
+                            width: res.0 as u32,
+                            height: res.1 as u32,
+                            depth_or_array_layers: 1,
+                        },
+                        TextureDimension::D2,
+                        data.iter()
+                            .flat_map(|f| f.to_ne_bytes())
+                            .collect::<Vec<u8>>(),
+                        TextureFormat::R32Float,
+                    ))
+                };
+
+                let wnoise = worley_texture_data(res, vec2(5., 5.));
+                let vnoise = value_texture_data(res, vec2(5., 5.));
+                let worley = make_image(&wnoise);
+                let value = make_image(&vnoise);
+                let material = cloud_materials.add(RMCloudMaterial {
+                    worley: Some(worley.clone()),
+                    value: Some(value.clone()),
+                    w3d: Some(w3d),
+                    sun_direction: vec3(1., 1., 0.).normalize(),
+                    ..default()
+                });
+
+                commands.spawn((
+                    RMCloud {
+                        handle: material.clone(),
+                        shadow_dist: 50.0,
+                        shadow_coef: 0.07,
+                        worley_factor: 0.5,
+                        value_factor: 0.3,
+                        cloud_coef: 0.3,
+                        cloud_height: 0.7,
+                    },
+                    MaterialMeshBundle {
+                        // mesh: meshes.add(cloud_gen::new(100.)),
+                        mesh: meshes.add(
+                            shape::Plane {
+                                size: 1000.0,
+                                ..default()
+                            }
+                            .into(),
+                        ),
+                        material,
+
+                        ..default()
+                    },
+                ));
             },
         );
     }
 }
 
+fn w3noise(res: usize) -> Vec<f32> {
+    let scale = vec3(10., 10., 10.);
+    let resolution = vec3(res as f32, res as f32, res as f32);
+    (0..res)
+        .flat_map(|x| (0..res).flat_map(move |y| (0..res).map(move |z| (x, y, z))))
+        .map(|(x, y, z)| {
+            let p = vec3(x as f32, y as f32, z as f32) / resolution * scale;
+            noise::wfbm(p, Vec3::ONE * 10000.)
+        })
+        .collect()
+}
+
 // A 16^3 chunk with 1-voxel boundary padding.
 
 // This chunk will cover just a single octant of a sphere SDF (radius 15).
+
+pub fn worley_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Vec<f32> {
+    let resolution = vec2(buffer_dimensions.0 as f32, buffer_dimensions.1 as f32);
+    (0..buffer_dimensions.0)
+        .flat_map(move |x| (0..buffer_dimensions.1).map(move |y| (x, y)))
+        .map(|(x, y)| {
+            let p = vec2(x.as_f32(), y.as_f32()) / resolution * scale;
+            noise::wfbm(p.extend(0.0), Vec3::ONE * 10000.0)
+        })
+        .collect()
+}
+
+pub fn value_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Vec<f32> {
+    let resolution = vec2(buffer_dimensions.0 as f32, buffer_dimensions.1 as f32);
+    println!("{resolution}");
+    (0..buffer_dimensions.0)
+        .flat_map(|x| (0..buffer_dimensions.1).map(move |y| (x, y)))
+        .map(|(x, y)| {
+            let p = vec2(x.as_f32(), y.as_f32()) / resolution * scale;
+            // let d = cloud_sdf(p);
+            (1.0 + noise::value_fbm(p.extend(0.0))) * 0.5
+        })
+        .collect()
+}
 
 pub fn new_cloud_data(buffer_dimensions: [usize; 3]) -> Vec<Vec4> {
     let resolution = vec3(
@@ -282,7 +360,7 @@ impl AsF32 for usize {
 /// You only need to implement functions for features that need non-default behavior. See the Material api docs for details!
 impl Material for RMCloudMaterial {
     fn fragment_shader() -> ShaderRef {
-        "shaders/rm_cloud.wgsl".into()
+        "shaders/cloud.wgsl".into()
     }
 
     fn alpha_mode(&self) -> AlphaMode {
@@ -299,27 +377,27 @@ pub struct RMCloudMaterial {
     #[uniform(0)]
     pub camera_position: Vec3,
     #[uniform(0)]
-    pub aabb_position: Vec3,
-    #[uniform(0)]
-    pub texture_dimensions: Vec3,
-    #[uniform(0)]
-    pub scale: Vec3,
-    #[uniform(0)]
     pub time: f32,
-    #[texture(1, dimension = "3d")]
-    #[sampler(2)]
-    pub sdf: Option<Handle<Image>>,
-}
+    #[uniform(0)]
+    pub shadow_dist: f32,
+    #[uniform(0)]
+    pub shadow_coef: f32,
+    #[uniform(0)]
+    pub worley_factor: f32,
+    #[uniform(0)]
+    pub value_factor: f32,
+    #[uniform(0)]
+    pub cloud_coef: f32,
+    #[uniform(0)]
+    pub cloud_height: f32,
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone, Default, Reflect)]
-#[uuid = "f692fd8e-d598-45ab-8225-97e2a3f056e0"]
-pub struct GodRayMaterial {
-    #[uniform(0)]
-    pub sun_direction: Vec3,
-    #[uniform(0)]
-    pub camera_position: Vec3,
-    #[uniform(0)]
-    pub scale: Vec3,
-    #[uniform(0)]
-    pub time: f32,
+    #[texture(1)]
+    #[sampler(2)]
+    pub worley: Option<Handle<Image>>,
+    #[texture(3)]
+    #[sampler(4)]
+    pub value: Option<Handle<Image>>,
+    #[texture(5, dimension = "3d")]
+    #[sampler(6)]
+    pub w3d: Option<Handle<Image>>,
 }

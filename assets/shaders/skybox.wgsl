@@ -97,5 +97,5 @@ fn fragment(
     var glow = exp(-d * vec3(4., 2., 1.) * .35)*2.;
     glow +=  exp(-d * vec3(1., 2., 4.) * 1.3 + mie_phase * 1.);
     glow += smoothstep(0.99,1.01,rds)+10.*smoothstep(0.999,1.0,rds)*vec3(1.,0.9,0.7);
-    return vec4(max(vec3(0.),glow*4.*water_mul), 1.);
+    return vec4(max(vec3(0.),glow*4.*water_mul), 1.)*vec4(0.4,0.6,1.0,1.0);
 }

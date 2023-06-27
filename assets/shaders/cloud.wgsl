@@ -1,20 +1,23 @@
+
 struct CustomMaterial {
-    color: vec4<f32>,
+    sun_direction: vec3<f32>,
     camera_position: vec3<f32>,
-    aabb_position: vec3<f32>,
-    texture_dim: vec3<f32>,
-    scale: vec3<f32>,
     time: f32,
+    shadow_dist: f32,
+    shadow_coef: f32,
+    worley_factor: f32,
+    value_factor: f32,
+    cloud_coef: f32,
+    cloud_height: f32,
 };
 
 fn rayleigh(costh: f32) -> f32 {
     return 3.0 / (16.0 * 3.14159265358979323846) * (1.0 + costh * costh);
 }
 
-fn HenyeyGreenstein(g: f32, costh: f32) -> f32
-{
+fn HenyeyGreenstein(g: f32, costh: f32) -> f32 {
     let pi = 3.1415926535897932384626433;
-    return (1.0 - g * g) / (4.0 * pi * pow(1.0 + g*g - 2.0*g*costh, 1.5));
+    return (1.0 - g * g) / (4.0 * pi * pow(1.0 + g * g - 2.0 * g * costh, 1.5));
 }
 
 
@@ -44,9 +47,17 @@ fn mie(costh: f32) -> f32 {
 @group(1) @binding(0)
 var<uniform> material: CustomMaterial;
 @group(1) @binding(1)
-var volume_tex: texture_3d<f32>;
+var w_tex: texture_2d<f32>;
 @group(1) @binding(2)
-var volume_sampler: sampler;
+var w_sampler: sampler;
+@group(1) @binding(3)
+var v_tex: texture_2d<f32>;
+@group(1) @binding(4)
+var v_sampler: sampler;
+@group(1) @binding(5)
+var w3_tex: texture_3d<f32>;
+@group(1) @binding(6)
+var w3_sampler: sampler;
 
 // @location(0) world_position: vec4<f32>,
 // @location(1) world_normal: vec3<f32>,
@@ -60,94 +71,205 @@ var volume_sampler: sampler;
 // @location(4) color: vec4<f32>,
 // #endif
 
-fn boxIntersection(ro: vec3<f32>, rd: vec3<f32>, boxSize: vec3<f32>) -> vec2<f32> {
-    let m = 1.0 / rd; // can precompute if traversing a set of aligned boxes
-    let n = m * ro;   // can precompute if traversing a set of aligned boxes
-    let k = abs(m) * boxSize;
-    let t1 = -n - k;
-    let t2 = -n + k;
-    let tN = max(max(t1.x, t1.y), t1.z);
-    let tF = min(min(t2.x, t2.y), t2.z);
-    if tN > tF || tF < 0.0 {return vec2(-1.0);}; // no intersection
-    return vec2(tN, tF);
-}
+// fn hash12(p: vec2<f32>) -> f32 {
+//     var p3 = fract(vec3(p.x, p.y, p.x) * .1031);
+//     p3 += dot(p3, p3.yzx + 33.33);
+//     return fract((p3.x + p3.y) * p3.z);
+// }
 
-fn hash12(p: vec2<f32>) -> f32 {
-    var p3 = fract(vec3(p.x, p.y, p.x) * .1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return fract((p3.x + p3.y) * p3.z);
-}
+// fn hash13(p3: vec3<f32>) -> f32 {
+//     var p3 = fract(p3 * .1031);
+//     p3 += dot(p3, p3.zyx + 31.32);
+//     return fract((p3.x + p3.y) * p3.z);
+// }
 
-fn hash13(p3: vec3<f32>) -> f32 {
-    var p3 = fract(p3 * .1031);
-    p3 += dot(p3, p3.zyx + 31.32);
-    return fract((p3.x + p3.y) * p3.z);
-}
-
-fn sdf(p: vec3<f32>) -> vec4<f32> {
-    return textureSample(volume_tex, volume_sampler, p);
-}
 
 fn fast_ne_exp(x: f32) -> f32 {
-    let a = x * 0.2 - 1.;
-    let b = a * a;
-    return b * b;
+    var g = x * 0.06 - 1.0; // 1
+    g = g * g; // 2
+    g = g * g; // 4
+    g = g * g; // 8
+    return g * g;
 }
 
-fn powder(x: f32) -> f32 {
-    let a = x * 0.2 - 1.; // nearly exp(-x)
-    let b = a * a; // 
-    let c = b * b; // Base
-    let d = c * c; // pow 2
-    let e = d * d; // pow 4
-    let f = e * e; // pow 8
-    return d - f*f;
+
+
+fn hash(p: vec3<f32>) -> f32 {
+    // replace this by something better {
+    var p = fract(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
+
+
+fn value_noise(x: vec3<f32>) -> vec4<f32> {
+    let i = floor(x);
+    let w = fract(x);
+
+    let u = w * w * w * (w * (w * 6.0 - 15.0) + 10.0);
+    let du = 30.0 * w * w * (w * (w - 2.0) + 1.0);    let a = hash(i + vec3(0.0, 0.0, 0.0));
+    let b = hash(i + vec3(1.0, 0.0, 0.0));
+    let c = hash(i + vec3(0.0, 1.0, 0.0));
+    let d = hash(i + vec3(1.0, 1.0, 0.0));
+    let e = hash(i + vec3(0.0, 0.0, 1.0));
+    let f = hash(i + vec3(1.0, 0.0, 1.0));
+    let g = hash(i + vec3(0.0, 1.0, 1.0));
+    let h = hash(i + vec3(1.0, 1.0, 1.0));
+
+    let k0 = a;
+    let k1 = b - a;
+    let k2 = c - a;
+    let k3 = e - a;
+    let k4 = a - b - c + d;
+    let k5 = a - c - e + g;
+    let k6 = a - b - e + f;
+    let k7 = -a + b + c - d + e - f - g + h;
+
+    let deriv = du * vec3(
+        k1 + k4 * u.y + k6 * u.z + k7 * u.y * u.z,
+        k2 + k5 * u.z + k4 * u.x + k7 * u.z * u.x,
+        k3 + k6 * u.x + k5 * u.y + k7 * u.x * u.y,
+    );
+    return vec4(
+        k0 + k1 * u.x + k2 * u.y + k3 * u.z + k4 * u.x * u.y + k5 * u.y * u.z + k6 * u.z * u.x + k7 * u.x * u.y * u.z,
+        deriv.x,
+        deriv.y,
+        deriv.z,
+    );
+}
+
+fn value_fbm(p: vec3<f32>) -> vec4<f32 > {
+    var p = p ;
+    var t = vec4(0.);
+    var s = 1.;
+    var c = 1.;
+
+    for (var i = 0; i < 3 ; i++) {
+        p += vec3(13.123, -72., 234.23);
+        t += (value_noise(p * s)) * c;
+        s *= 2.;
+        c *= 0.5;
+    }
+    return t / 2.7;
+}
+
+fn spe(rd: vec3<f32>, nor: vec3<f32>, sun: vec3<f32>) -> f32 {
+    let refel = reflect(rd, nor);
+    return pow(max(0., dot(refel, sun)), 20.);
+}
+
+
+// fn cloud(uv: vec2<f32>) -> f32 {
+//     return (textureSample(w_tex, w_sampler, uv + material.time*0.005).x  - material.worley_factor) * ( textureSample(v_tex, v_sampler, (uv) - material.time * vec2(-0.01,0.01)  ).x - material.value_factor) * material.cloud_coef ;
+// }
+// fn cloud(uv: vec2<f32>) -> f32 {
+//     let w = textureSample(w_tex, w_sampler, uv + material.time * 0.005) - material.worley_factor ;
+//     let v = textureSample(v_tex, v_sampler, (uv) - material.time * vec2(-0.01, 0.01)) - material.value_factor ;
+//     let p = vec4(v.x, w.y * v.y, w.z * v.z, w.w * v.w) ;
+//     return (p.x + p.y * 0.5 + p.z * 0.25 + p.w * 0.125) * material.cloud_coef ;
+// }
+
+fn sdSpiral( p: vec2<f32>, w: f32, h: f32 ) -> f32 {
+    // base point
+    var p = p;
+    var w = w;
+    var d = length(p);
+    // 8 arcs
+    for( var i=0; i<8; i++ ) {
+        p.x -= w;
+        if( p.x<0.0 && p.y>0.0 ) {d = min( d, abs(length(p)-w) ); }
+        p.y -= w;
+        p = vec2(-p.y,p.x);
+        w *= h;
+    }
+    // tip point
+    return min( d, length(p) );
+}
+
+fn rot(a: f32) -> mat2x2<f32> {
+    let s = sin(a);
+    let c = cos(a);
+    return mat2x2(c,-s,s,c);
+}
+
+fn cloud(p: vec3<f32>) -> f32 {
+    let w3 = textureSample(w3_tex,w3_sampler,p * vec3(10.0,10.,10.)).x ;
+    let w = textureSample(w_tex, w_sampler, p.xz + material.time * 0.001) - material.worley_factor ;
+    let v = textureSample(v_tex, v_sampler, (p.xz* 2.0) - material.time * vec2(-0.01, 0.005)) - material.value_factor ;
+    return w3*0.2*v.x  +   pow(w.x, 2.5) *  material.cloud_coef ;// * v.x ;
+
+}
+
+
 
 @fragment
 fn fragment(
     #import bevy_pbr::mesh_vertex_output
 ) -> @location(0) vec4<f32> {
-    let ro = material.camera_position - material.aabb_position;
+    let sun_dir = material.sun_direction  ;
+
+    var water = vec3(0.);
+    var p = vec3(uv.x,2.0,uv.y);
+    var count = 0.;
+    var pr = 1.0;
+    var pj = 1.0;
     let rd = normalize(world_position.xyz - material.camera_position);
-    let sun_dir = normalize(vec3(1., .3, -1.));
-    let mei = mie(dot(rd, sun_dir));
-    let inv_sca = 1./material.scale;
-    let mo = ro +0.5*material.scale;
-    var p = ro;
-    var dt = 0.1;
-    var steps = 0.;
-    var light = vec3(0.);
-    var absorbtion = 0.;
-    let intersection = boxIntersection(ro, rd, vec3(0.5)*material.scale);
-    var i = max(intersection.x, 0.) + hash13(vec3(uv * 913.123, material.time )) * 1.;
-    for (; i < intersection.y; i += dt*100.) {
-        if absorbtion > 4. {
-            absorbtion = 6.;
+    let dj = 0.01;
+    var jp = dj;
+    for (var j = 0.1; j < 2.2 ; j += max(0.01,dj * abs(jp ) * j * 100.  )){
+        p = vec3(uv.x,2.0,uv.y) + vec3(rd.x,rd.y,-rd.z) *  j * 0.1;
+        let samp = max(material.cloud_height,cloud(p));
+        jp = (2.0 - j  - samp );
+        if 0.0 > jp{
+            // p = uv + vec2(rd.x,-rd.z) * 0.1 * j - dj + dj*(pr - pj) / ( (2.0 - j) - pr - pj );
+            // count = samp - (2.0 - j);
             break;
         }
-        steps += 1.;
-        p = mo + i * rd;
-        let samp = sdf(p*inv_sca );
-        let d = samp.x - 0.03;
-        if d < 0.0 {
-            let dens = abs(samp.z*2.);
-            // let dens = 1.;
-            absorbtion += dt * 20. * dens ;
-            let transmission = fast_ne_exp(absorbtion);
-            let direct = samp.y * 10.;
-            let scater = 40. * vec3(0.6,0.8,1.) ;
-            light += (direct + scater) * transmission * dt   ;
-        }
-        dt = max(abs(samp.x)  , 0.01);
+        pr = samp;
+        pj = 2.0 - j;
+        count += 0.07;
+    }
+    let samp = cloud(p);
+    let samps = cloud(p + sun_dir * 0.001);
+    let sampd = pow(samps - samp, 1.) ;
+    var h = samp;
+    let w = cloud((p - 0.3));
+    var sha = vec3(1.0);
+    let minh = material.cloud_height  ;
+    let dens = smoothstep(minh, minh + 0.1, samp);
+    if dens == 0.0 {
+        h = minh;
+    }
+    for (var d = 0.1; d < material.shadow_dist; d += d) {
+        let s = cloud(p - sun_dir * d * 0.001);
+        let u = s - sun_dir.y * d * 0.001 - h;
+        sha *= smoothstep(0.1, 0., u * (material.shadow_dist - d) * material.shadow_coef);
+    }
+    // sha = pow(sha, vec3(0.8, 0.9, 1.));
+    var light = 0.4 *vec3(0.3, 0.5, 1.) * (0.5 + smoothstep(0.05, -0.03, sampd )) + smoothstep(-0.04, 0.04, sampd) * 6.0 * vec3(1.1, 0.8, 0.6) * sha      ;
+    light +=  count * count * count * count * vec3(1.0,1.2,1.5) *  2.1 * (1.0 - sha)  ;
+    
+
+
+        {
+
+        let pos = world_position.xyz * 0.2;
+        let rd = normalize(world_position.xyz - material.camera_position);
+        let sun = sun_dir * vec3(-1., 1., 1.);
+        var noi = value_fbm(pos*2.25 + material.time * 0.3) + value_fbm(pos*1.5 - material.time * 0.3);
+        var nor = normalize(mix(noi.yzw, vec3(0., 1., 0.), 0.6));
+        let fre = pow(sqrt(
+            0.5 + dot(nor, rd) * .5 + .5,
+        ), 2.);
+
+        let sdn = dot(nor, sun);
+        let deep = vec3(0.05, 0.05, 0.1);
+        water = deep + (spe(rd, nor, sun) + max(0., sdn) * vec3(0.0, 0.3, 0.2) * 0.1) * sha ;
     }
 
-    // return vec4( vec3(mie(dot(sun_dir,rd))),1.);
-    return vec4(light, 1. - fast_ne_exp(absorbtion));
-    // return vec4( vec3(steps*0.01),1.);
-    // return vec4(
-    //     vec3(sdf(vec3(world_position.xy+0.5,0.5)).x),1.
-    // );
 
-
+    let col = mix(light, water * (1.0 + sha), 1. - dens);
+    return vec4(col, 1.0);
+    // return vec4(vec3(count),1.0);
+    // return vec4(vec3(smoothstep(0.,10., textureSample(w3_tex,w3_sampler,vec3(uv.x,material.time*0.01, uv.y) * 10.0).x ) ) , 1.0);
 }

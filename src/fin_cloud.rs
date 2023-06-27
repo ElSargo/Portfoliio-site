@@ -313,7 +313,7 @@ fn generate_fin_data(data: &MeshData, scale: f64, resolution: (usize, usize)) ->
     }
 
     let num_fins = (positions.len() / 4) as f64;
-    uvs.iter_mut().map(|z| z /= num_fins);
+    uvs.iter_mut().map(|z| *z /= num_fins);
 
     FinData {
         positions,

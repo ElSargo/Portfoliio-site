@@ -3,23 +3,23 @@
 
   inputs = {
     fenix = {
-      url = "github:nix-community/fenix";
+      url = "github:nix-community/fenix/monthly";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
+
   outputs = { self, nixpkgs, flake-utils, fenix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        rust_toolchain = fenix.packages.${system}.complete.toolchain;
-      in with pkgs; {
+        rust = fenix.packages.${system}.complete.toolchain;
+      in {
         nixpkgs.overlays = [ fenix.overlays.complete ];
-        devShells.default = mkShell rec {
+        devShells.default = pkgs.mkShell rec {
 
-
-          nativeBuildInputs =  [
+          nativeBuildInputs = with pkgs; [
             pkg-config
             cmake
             pkg-config
@@ -29,22 +29,26 @@
           ];
 
           buildInputs = [
-            rust_toolchain
-            lldb_15
-            sccache
-            sccache
-            udev
-            alsa-lib
-            vulkan-loader
-            xorg.libX11
-            xorg.libXcursor
-            xorg.libXi
-            xorg.libXrandr
-            libxkbcommon
-            wayland
-            wasm-bindgen-cli
+            rust
+            pkgs.lld
+            pkgs.lldb_9
+            pkgs.mold
+            pkgs.clang
+            pkgs.fish
+            pkgs.sccache
+            pkgs.udev
+            pkgs.alsa-lib
+            pkgs.vulkan-loader
+            pkgs.xorg.libX11
+            pkgs.xorg.libXcursor
+            pkgs.xorg.libXi
+            pkgs.xorg.libXrandr
+            pkgs.libxkbcommon
+            pkgs.wayland
           ];
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath buildInputs;
+          shellHook = # bash
+            "[ $0 = 'bash' ] && exec fish";
         };
       });
 }

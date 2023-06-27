@@ -1,8 +1,11 @@
+// orbital scene
 
-
-orbital scene
-
-use bevy::{core_pipeline::bloom::BloomSettings, math::vec3, prelude::*};
+use bevy::{
+    core_pipeline::bloom::BloomSettings,
+    math::vec3,
+    prelude::*,
+    render::render_resource::{AddressMode, FilterMode, SamplerDescriptor},
+};
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use cloud_blob::CloudBlobPlugin;
@@ -10,10 +13,10 @@ use skybox::{CubemapMaterial, SkyBoxPlugin};
 use water::WaterPlugin;
 mod camera;
 mod cloud_blob;
-mod fin_cloud;
+// mod fin_cloud;
+mod cloud;
 mod noise;
 mod noise_shader;
-mod rm_cloud;
 mod sdf;
 mod skybox;
 mod test_cloud_shader;
@@ -21,14 +24,29 @@ mod water;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(AssetPlugin {
-            watch_for_changes: true,
-            ..Default::default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(AssetPlugin {
+                    watch_for_changes: true,
+                    ..Default::default()
+                })
+                .set(ImagePlugin {
+                    default_sampler: SamplerDescriptor {
+                        address_mode_u: AddressMode::MirrorRepeat,
+                        address_mode_v: AddressMode::MirrorRepeat,
+                        address_mode_w: AddressMode::MirrorRepeat,
+                        mag_filter: FilterMode::Linear,
+                        min_filter: FilterMode::Linear,
+                        mipmap_filter: FilterMode::Linear,
+
+                        ..Default::default()
+                    },
+                }),
+        )
         .add_plugin(WorldInspectorPlugin::new())
-        // .add_plugin(rm_cloud::RMCloudPlugin)
-        .add_plugin(fin_cloud::FinCloudPlugin)
-        .add_plugin(CloudBlobPlugin)
+        .add_plugin(cloud::RMCloudPlugin)
+        // .add_plugin(fin_cloud::FinCloudPlugin)
+        // .add_plugin(CloudBlobPlugin)
         // .add_plugin(WaterPlugin)
         .add_startup_system(setup)
         .add_plugin(FlyCameraPlugin)

@@ -45,14 +45,15 @@ pub fn value_noise(x: Vec3) -> f32 {
         + k7 * u.x * u.y * u.z;
 }
 
-pub fn value_fbm(mut p: Vec3) -> f32 {
+pub fn value_fbm(p: Vec3) -> f32 {
+    let mut p = p;
     let mut t = 0.;
     let mut s = 1.;
     let mut c = 1.;
 
-    for _ in 0..12 {
-        p += vec3(13.123, -72., 234.23);
-        t += value_noise(p * s) * c;
+    for _ in 0..4 {
+        // p += vec3(13.123, -72., 234.23);
+        t += noised(p * s).x * c;
         s *= 2.;
         c *= 0.5;
     }
@@ -125,7 +126,7 @@ pub fn fbmd(mut p: Vec3) -> Vec4 {
     let mut s = 1.;
     let mut c = 1.;
 
-    for i in 0..11 {
+    for i in 0..4 {
         p += vec3(13.123, -72., 234.23);
         let n = noised(p * s) * c;
         t.x += n.x;
@@ -135,14 +136,14 @@ pub fn fbmd(mut p: Vec3) -> Vec4 {
             t.w += n.w;
         }
         s *= 2.;
-        c *= 0.65;
+        c *= 0.5;
 
         let rot = rotate(2.135532) * p.xz();
         p = vec3(rot.x, p.y, rot.y);
         let rot = rotate(1.5532) * p.yz();
         p = vec3(p.x, rot.x, rot.y);
     }
-    return t / 2.7;
+    return t;
 }
 
 pub fn worley_noise(p: Vec3, f: Vec3) -> f32 {
@@ -163,7 +164,7 @@ pub fn worley_noise(p: Vec3, f: Vec3) -> f32 {
         }
     }
 
-    return min_dist;
+    return min_dist.sqrt();
 }
 
 pub fn wfbm(p: Vec3, f: Vec3) -> f32 {
@@ -172,7 +173,7 @@ pub fn wfbm(p: Vec3, f: Vec3) -> f32 {
     let mut s = 1.;
     let mut c = 1.;
 
-    for _ in 0..11 {
+    for _ in 0..12 {
         p += vec3(13.123, -72., 234.23);
         let n = worley_noise(p * s, f);
         t += n * c;
@@ -183,7 +184,7 @@ pub fn wfbm(p: Vec3, f: Vec3) -> f32 {
         let rot = rotate(1.135532) * p.yz();
         p = vec3(p.x, rot.x, rot.y);
     }
-    return t;
+    return 4.0 - t;
 }
 
 fn rotate(a: f32) -> Mat2 {
