@@ -193,10 +193,10 @@ fn rot(a: f32) -> mat2x2<f32> {
 }
 
 fn cloud(p: vec3<f32>) -> f32 {
-    let w3 = textureSample(w3_tex,w3_sampler,p * vec3(10.0,10.,10.)).x ;
-    let w = textureSample(w_tex, w_sampler, p.xz + material.time * 0.001) - material.worley_factor ;
-    let v = textureSample(v_tex, v_sampler, (p.xz* 2.0) - material.time * vec2(-0.01, 0.005)) - material.value_factor ;
-    return w3*0.2*v.x  +   pow(w.x, 2.5) *  material.cloud_coef ;// * v.x ;
+    let w3 = textureSample(w3_tex,w3_sampler, vec3(10.0,10.,10.) * (p  + vec3(1.0,0.0,1.0) * material.time * 0.01)).x ;
+    let w = textureSample(w_tex, w_sampler, p.xz + material.time * 0.01) - material.worley_factor ;
+    let v = textureSample(v_tex, v_sampler, (p.xz* 2.0) - material.time * vec2(0.011, 0.0098)) - material.value_factor ;
+    return w3*0.0*v.x  +   pow(w.x, 2.5) *  material.cloud_coef ;// * v.x ;
 
 }
 
@@ -207,7 +207,6 @@ fn fragment(
     #import bevy_pbr::mesh_vertex_output
 ) -> @location(0) vec4<f32> {
     let sun_dir = material.sun_direction  ;
-
     var water = vec3(0.);
     var p = vec3(uv.x,2.0,uv.y);
     var count = 0.;
@@ -227,7 +226,7 @@ fn fragment(
         }
         pr = samp;
         pj = 2.0 - j;
-        count += 0.07;
+        count += 0.2;
     }
     let samp = cloud(p);
     let samps = cloud(p + sun_dir * 0.001);
@@ -239,15 +238,16 @@ fn fragment(
     let dens = smoothstep(minh, minh + 0.1, samp);
     if dens == 0.0 {
         h = minh;
+        // p  -= sun_dir * 0.01;
     }
     for (var d = 0.1; d < material.shadow_dist; d += d) {
         let s = cloud(p - sun_dir * d * 0.001);
         let u = s - sun_dir.y * d * 0.001 - h;
-        sha *= smoothstep(0.1, 0., u * (material.shadow_dist - d) * material.shadow_coef);
+        sha *= smoothstep(0.1 , -0.004 * d, u * (material.shadow_dist - d) * material.shadow_coef);
     }
-    // sha = pow(sha, vec3(0.8, 0.9, 1.));
+    sha = pow(sha, vec3(1.0,0.95,0.9));
     var light = 0.4 *vec3(0.3, 0.5, 1.) * (0.5 + smoothstep(0.05, -0.03, sampd )) + smoothstep(-0.04, 0.04, sampd) * 6.0 * vec3(1.1, 0.8, 0.6) * sha      ;
-    light +=  count * count * count * count * vec3(1.0,1.2,1.5) *  2.1 * (1.0 - sha)  ;
+    // light +=  pow(count ,3.0)* vec3(1.0,1.2,1.5) *  20.1 * (1.0 - sha)  ;
     
 
 
@@ -270,6 +270,5 @@ fn fragment(
 
     let col = mix(light, water * (1.0 + sha), 1. - dens);
     return vec4(col, 1.0);
-    // return vec4(vec3(count),1.0);
     // return vec4(vec3(smoothstep(0.,10., textureSample(w3_tex,w3_sampler,vec3(uv.x,material.time*0.01, uv.y) * 10.0).x ) ) , 1.0);
 }

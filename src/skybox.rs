@@ -77,6 +77,7 @@ pub fn setup(
                                 y: y as f32,
                                 z: 1.,
                             } / 200.,
+                            Vec3::ONE * 10000.,
                         )
                         .x;
                         data[x][y] = n;

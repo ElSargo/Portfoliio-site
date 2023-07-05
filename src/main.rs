@@ -8,11 +8,11 @@ use bevy::{
 };
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use cloud_blob::CloudBlobPlugin;
+// use cloud_blob::CloudBlobPlugin;
 use skybox::{CubemapMaterial, SkyBoxPlugin};
-use water::WaterPlugin;
+// use water::WaterPlugin;
 mod camera;
-mod cloud_blob;
+// mod cloud_blob;
 // mod fin_cloud;
 mod cloud;
 mod noise;
@@ -32,9 +32,9 @@ fn main() {
                 })
                 .set(ImagePlugin {
                     default_sampler: SamplerDescriptor {
-                        address_mode_u: AddressMode::MirrorRepeat,
-                        address_mode_v: AddressMode::MirrorRepeat,
-                        address_mode_w: AddressMode::MirrorRepeat,
+                        address_mode_u: AddressMode::Repeat,
+                        address_mode_v: AddressMode::Repeat,
+                        address_mode_w: AddressMode::Repeat,
                         mag_filter: FilterMode::Linear,
                         min_filter: FilterMode::Linear,
                         mipmap_filter: FilterMode::Linear,
