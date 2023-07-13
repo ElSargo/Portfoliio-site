@@ -14,6 +14,7 @@ struct RMCloud {
     pub handle: Handle<RMCloudMaterial>,
     pub shadow_dist: f32,
     pub shadow_coef: f32,
+    pub sun_pen: f32,
     pub worley_factor: f32,
     pub value_factor: f32,
     pub cloud_coef: f32,
@@ -33,7 +34,7 @@ impl Plugin for RMCloudPlugin {
              time: Res<Time>| {
                 let camera_position = cam.get_single().unwrap().translation;
                 let sun_dir = sun.get_single().unwrap().forward();
-                for (cloud, transform) in &clouds {
+                for (cloud, _transform) in &clouds {
                     if let Some(material) = cloud_materials.get_mut(&cloud.handle) {
                         material.camera_position = camera_position;
                         material.time = time.raw_elapsed_seconds();
@@ -54,6 +55,7 @@ impl Plugin for RMCloudPlugin {
                             material.value_factor = cloud.value_factor;
                             material.cloud_coef = cloud.cloud_coef;
                             material.cloud_height = cloud.cloud_height;
+                            material.sun_pen = cloud.sun_pen;
                         }
                         None => {}
                     };
@@ -70,7 +72,7 @@ impl Plugin for RMCloudPlugin {
              // mut noise_materials: ResMut<Assets<NoiseMaterial>>,
              mut images: ResMut<Assets<Image>>| {
                 let res = (1000, 1000);
-                let re3 = 128;
+                let re3 = 2;
 
                 let w3d = {
                     images.add(Image::new(
@@ -119,11 +121,12 @@ impl Plugin for RMCloudPlugin {
                     RMCloud {
                         handle: material.clone(),
                         shadow_dist: 50.0,
-                        shadow_coef: 0.07,
-                        worley_factor: 1.5,
-                        value_factor: 0.5,
-                        cloud_coef: 0.1,
-                        cloud_height: 0.4,
+                        shadow_coef: 0.1,
+                        sun_pen: 30.,
+                        worley_factor: 0.1,
+                        value_factor: 0.0,
+                        cloud_coef: 0.2,
+                        cloud_height: 0.2,
                     },
                     MaterialMeshBundle {
                         // mesh: meshes.add(cloud_gen::new(100.)),
@@ -182,10 +185,10 @@ pub fn value_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Vec
         .map(|(x, y)| {
             let p = vec2(x.as_f32(), y.as_f32()) / resolution * scale;
             // let d = cloud_sdf(p);
-            (1.0 + noise::value_fbm(
+            noise::value_fbm(
                 p.extend(0.0),
                 vec3(resolution.x, resolution.y, resolution.y),
-            )) * 0.5
+            )
         })
         .collect()
 }
@@ -299,47 +302,6 @@ fn rotate(v: Vec3, x: f32, y: f32, z: f32) -> Vec3 {
     Mat3::from_euler(bevy::prelude::EulerRot::XYZ, x, y, z) * v
 }
 
-fn mie(costh: f32) -> f32 {
-    // This function was optimized to minimize (delta*delta)/reference in order to capture
-    // the low intensity behavior.
-    let params = [
-        9.805233e-06,
-        -6.500000e+01,
-        -5.500000e+01,
-        8.194068e-01,
-        1.388198e-01,
-        -8.370334e+01,
-        7.810083e+00,
-        2.054747e-03,
-        2.600563e-02,
-        -4.552125e-12,
-    ];
-
-    let p1 = costh + params[3];
-    let exp_values = vec4(
-        params[1] * costh + params[2],
-        params[5] * p1 * p1,
-        params[6] * costh,
-        params[9] * costh,
-    )
-    .exp();
-    let exp_val_weight = vec4(params[0], params[4], params[7], params[8]);
-    return exp_values.dot(exp_val_weight) * 0.25;
-}
-
-pub fn coord_to_pos<T: AsF32 + Copy>(coord: [T; 3], res: Vec3) -> Vec3 {
-    (vec3(coord[0].as_f32(), coord[1].as_f32(), coord[2].as_f32()) / res - 0.5) * 2.
-}
-
-pub fn pos_to_coord(p: Vec3, res: Vec3) -> [usize; 3] {
-    let c = ((p / 2.) + 0.5) * res;
-    [
-        c.x.round() as usize,
-        c.y.round() as usize,
-        c.z.round() as usize,
-    ]
-}
-
 pub trait AsF32 {
     fn as_f32(self) -> f32;
 }
@@ -385,6 +347,8 @@ pub struct RMCloudMaterial {
     pub shadow_dist: f32,
     #[uniform(0)]
     pub shadow_coef: f32,
+    #[uniform(0)]
+    pub sun_pen: f32,
     #[uniform(0)]
     pub worley_factor: f32,
     #[uniform(0)]

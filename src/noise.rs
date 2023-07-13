@@ -1,4 +1,7 @@
-#![allow(dead_code)]
+#![allow(clippy::all)]
+#![allow(unused)]
+
+use std::f32::consts::E;
 
 use bevy::{
     math::{mat2, mat3, vec2, vec3, vec4, Vec3Swizzles},
@@ -51,7 +54,7 @@ pub fn value_fbm(p: Vec3, f: Vec3) -> f32 {
     let mut s = 1.;
     let mut c = 1.;
 
-    for _ in 0..4 {
+    for _ in 0..20 {
         p += vec3(13.123, -72., 234.23);
         t += noised(p * s, f * s).x * c;
         s *= 2.;
@@ -61,7 +64,7 @@ pub fn value_fbm(p: Vec3, f: Vec3) -> f32 {
         let rot = rotate(1.135532) * p.yz();
         p = vec3(p.x, rot.x, rot.y);
     }
-    return t / 2.7;
+    return (t / E * 1.75).clamp(0.0, 2.0);
 }
 
 const ROTATE: Mat3 = mat3(
@@ -81,20 +84,21 @@ fn remap(x: f32, a: f32, b: f32, c: f32, d: f32) -> f32 {
     return (((x - a) / (b - a)) * (d - c)) + c;
 }
 
+// TODO: tiling
 pub fn noised(x: Vec3, f: Vec3) -> Vec4 {
     let i = x.floor();
     let w = x.fract();
     // cubic interpolation
     let u = w * w * (3.0 - 2.0 * w);
     let du = 6.0 * w * (1.0 - w);
-    let a = hash((i + vec3(0.0, 0.0, 0.0)) % f);
-    let b = hash((i + vec3(1.0, 0.0, 0.0)) % f);
-    let c = hash((i + vec3(0.0, 1.0, 0.0)) % f);
-    let d = hash((i + vec3(1.0, 1.0, 0.0)) % f);
-    let e = hash((i + vec3(0.0, 0.0, 1.0)) % f);
-    let f = hash((i + vec3(1.0, 0.0, 1.0)) % f);
-    let g = hash((i + vec3(0.0, 1.0, 1.0)) % f);
-    let h = hash((i + vec3(1.0, 1.0, 1.0)) % f);
+    let a = hash((i + vec3(0.0, 0.0, 0.0)) /*% f*/);
+    let b = hash((i + vec3(1.0, 0.0, 0.0)) /*% f*/);
+    let c = hash((i + vec3(0.0, 1.0, 0.0)) /*% f*/);
+    let d = hash((i + vec3(1.0, 1.0, 0.0)) /*% f*/);
+    let e = hash((i + vec3(0.0, 0.0, 1.0)) /*% f*/);
+    let f = hash((i + vec3(1.0, 0.0, 1.0)) /*% f*/);
+    let g = hash((i + vec3(0.0, 1.0, 1.0)) /*% f*/);
+    let h = hash((i + vec3(1.0, 1.0, 1.0)) /*% f*/);
 
     let k0 = a;
     let k1 = b - a;
@@ -150,6 +154,7 @@ pub fn noised(x: Vec3, f: Vec3) -> Vec4 {
 //     return t;
 // }
 
+// TODO: tiling
 pub fn worley_noise(p: Vec3, f: Vec3) -> f32 {
     let id = p.floor();
 
@@ -160,7 +165,7 @@ pub fn worley_noise(p: Vec3, f: Vec3) -> f32 {
         for y in [-1., 0., 1.] {
             for z in [-1., 0., 1.] {
                 let offset = vec3(x, y, z);
-                let mut h = hash33((id + offset) % f) * 0.5 + 0.5;
+                let mut h = hash33((id + offset) /*% f*/) * 0.5 + 0.5;
                 h += offset;
                 let d = p - h;
                 min_dist = min_dist.min(d.dot(d));
@@ -177,18 +182,18 @@ pub fn wfbm(p: Vec3, f: Vec3) -> f32 {
     let mut s = 1.;
     let mut c = 1.;
 
-    for _ in 0..12 {
+    for _ in 0..3 {
         p += vec3(13.123, -72., 234.23);
         let n = worley_noise(p * s, f * s);
         t += n * c;
-        s *= 2.;
-        c *= 0.5;
+        s *= std::f32::consts::PI;
+        c /= std::f32::consts::PI;
         let rot = rotate(2.135532) * p.xz();
         p = vec3(rot.x, p.y, rot.y);
         let rot = rotate(1.135532) * p.yz();
         p = vec3(p.x, rot.x, rot.y);
     }
-    return 4.0 - t;
+    return (E - t - 1.25).clamp(0.0, 2.0);
 }
 
 fn rotate(a: f32) -> Mat2 {

@@ -49,6 +49,7 @@ impl Default for CameraController {
 }
 use std::f32::consts::PI;
 
+#[allow(dead_code)]
 pub fn camera_controller(
     time: Res<Time>,
     mut mouse_events: EventReader<MouseMotion>,

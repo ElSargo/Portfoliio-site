@@ -9,7 +9,7 @@ use bevy::{
 use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 // use cloud_blob::CloudBlobPlugin;
-use skybox::{CubemapMaterial, SkyBoxPlugin};
+// use skybox::{CubemapMaterial, SkyBoxPlugin};
 // use water::WaterPlugin;
 mod camera;
 // mod cloud_blob;
@@ -32,9 +32,9 @@ fn main() {
                 })
                 .set(ImagePlugin {
                     default_sampler: SamplerDescriptor {
-                        address_mode_u: AddressMode::Repeat,
-                        address_mode_v: AddressMode::Repeat,
-                        address_mode_w: AddressMode::Repeat,
+                        address_mode_u: AddressMode::MirrorRepeat,
+                        address_mode_v: AddressMode::MirrorRepeat,
+                        address_mode_w: AddressMode::MirrorRepeat,
                         mag_filter: FilterMode::Linear,
                         min_filter: FilterMode::Linear,
                         mipmap_filter: FilterMode::Linear,
@@ -50,8 +50,8 @@ fn main() {
         // .add_plugin(WaterPlugin)
         .add_startup_system(setup)
         .add_plugin(FlyCameraPlugin)
-        .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
-        .add_plugin(SkyBoxPlugin {})
+        // .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
+        // .add_plugin(SkyBoxPlugin {})
         // .add_plugin(LogDiagnosticsPlugin::default())
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .run();
@@ -96,7 +96,7 @@ fn setup(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0., 10., -10.).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(0., 400., -10.).looking_at(Vec3::ZERO, Vec3::Y),
             projection: Projection::Perspective(PerspectiveProjection {
                 far: 100_000.,
                 ..default()
