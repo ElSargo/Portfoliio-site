@@ -169,10 +169,7 @@ pub fn worley_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Ve
         .flat_map(move |x| (0..buffer_dimensions.1).map(move |y| (x, y)))
         .map(|(x, y)| {
             let p = vec2(x.as_f32(), y.as_f32()) / resolution * scale;
-            noise::wfbm(
-                p.extend(0.0),
-                vec3(resolution.x, resolution.y, resolution.y),
-            )
+            noise::wfbm(p.extend(0.0), vec3(scale.x, scale.y, scale.y))
         })
         .collect()
 }
@@ -185,10 +182,7 @@ pub fn value_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Vec
         .map(|(x, y)| {
             let p = vec2(x.as_f32(), y.as_f32()) / resolution * scale;
             // let d = cloud_sdf(p);
-            noise::value_fbm(
-                p.extend(0.0),
-                vec3(resolution.x, resolution.y, resolution.y),
-            )
+            noise::value_fbm(p.extend(0.0), vec3(scale.x, scale.y, scale.y))
         })
         .collect()
 }

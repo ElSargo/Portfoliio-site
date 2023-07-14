@@ -32,9 +32,9 @@ fn main() {
                 })
                 .set(ImagePlugin {
                     default_sampler: SamplerDescriptor {
-                        address_mode_u: AddressMode::MirrorRepeat,
-                        address_mode_v: AddressMode::MirrorRepeat,
-                        address_mode_w: AddressMode::MirrorRepeat,
+                        address_mode_u: AddressMode::Repeat,
+                        address_mode_v: AddressMode::Repeat,
+                        address_mode_w: AddressMode::Repeat,
                         mag_filter: FilterMode::Linear,
                         min_filter: FilterMode::Linear,
                         mipmap_filter: FilterMode::Linear,
@@ -96,7 +96,7 @@ fn setup(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0., 400., -10.).looking_at(Vec3::ZERO, Vec3::Y),
+            transform: Transform::from_xyz(0., 400., -10.).looking_at(Vec3::ZERO, Vec3::Z),
             projection: Projection::Perspective(PerspectiveProjection {
                 far: 100_000.,
                 ..default()
