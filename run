@@ -1,2 +1,0 @@
-#! /usr/bin/env bash
-cargo run --locked --features bevy/dynamic_linking

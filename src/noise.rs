@@ -62,7 +62,7 @@ pub fn value_fbm(p: Vec3, f: Vec3) -> f32 {
     let mut s = 1.;
     let mut c = 1.;
 
-    for _ in 0..20 {
+    for _ in 0..8 {
         p += dvec3(24.0, 16.0, 34.0);
         t += dnoised(p * s, f * s) * c;
         s *= 2.;

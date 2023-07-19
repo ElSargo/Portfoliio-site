@@ -1,13 +1,18 @@
 // orbital scene
 
+use std::f32::consts::PI;
+
 use bevy::{
     core_pipeline::bloom::BloomSettings,
+    input::mouse::MouseWheel,
     math::vec3,
     prelude::*,
     render::render_resource::{AddressMode, FilterMode, SamplerDescriptor},
 };
-use bevy_fly_camera::{FlyCamera, FlyCameraPlugin};
+
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use camera::{camera_controller, CameraController};
+use cloud::RMCloud;
 // use cloud_blob::CloudBlobPlugin;
 // use skybox::{CubemapMaterial, SkyBoxPlugin};
 // use water::WaterPlugin;
@@ -49,7 +54,9 @@ fn main() {
         // .add_plugin(CloudBlobPlugin)
         // .add_plugin(WaterPlugin)
         .add_startup_system(setup)
-        .add_plugin(FlyCameraPlugin)
+        .add_system(camera_controller)
+        .add_system(scroll)
+        // .add_plugin(FlyCameraPlugin)
         // .add_plugin(MaterialPlugin::<CubemapMaterial>::default())
         // .add_plugin(SkyBoxPlugin {})
         // .add_plugin(LogDiagnosticsPlugin::default())
@@ -57,8 +64,15 @@ fn main() {
         .run();
 }
 
-#[derive(Component, Default)]
-pub struct CameraController {}
+fn scroll(mut clouds: Query<&mut RMCloud>, mut scroll: EventReader<MouseWheel>) {
+    let scrolled: f32 = scroll.iter().map(|c| c.y * 0.001).sum();
+    for mut cloud in clouds.iter_mut() {
+        cloud.scroll += scrolled;
+    }
+}
+
+// #[derive(Component, Default)]
+// pub struct CameraController {}
 fn setup(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -96,7 +110,12 @@ fn setup(
     // camera
     commands.spawn((
         Camera3dBundle {
-            transform: Transform::from_xyz(0., 400., -10.).looking_at(Vec3::ZERO, Vec3::Z),
+            transform: Transform::from_xyz(0.0, 600., 0.0).with_rotation(Quat::from_euler(
+                EulerRot::XYZ,
+                -1.5,
+                0.0,
+                PI,
+            )),
             projection: Projection::Perspective(PerspectiveProjection {
                 far: 100_000.,
                 ..default()
@@ -113,6 +132,5 @@ fn setup(
             ..default()
         },
         CameraController::default(),
-        FlyCamera { ..default() },
     ));
 }

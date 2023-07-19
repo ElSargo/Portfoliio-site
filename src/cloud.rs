@@ -3,14 +3,14 @@ use bevy::math::vec2;
 // use crate::noise::fbmd;
 use crate::{noise, CameraController};
 use bevy::{
-    math::{vec3, vec4},
+    math::vec3,
     prelude::*,
     reflect::TypeUuid,
     render::render_resource::{AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat},
 };
 
 #[derive(Component, Default, Reflect)]
-struct RMCloud {
+pub struct RMCloud {
     pub handle: Handle<RMCloudMaterial>,
     pub shadow_dist: f32,
     pub shadow_coef: f32,
@@ -19,6 +19,7 @@ struct RMCloud {
     pub value_factor: f32,
     pub cloud_coef: f32,
     pub cloud_height: f32,
+    pub scroll: f32,
 }
 
 pub struct RMCloudPlugin;
@@ -56,6 +57,7 @@ impl Plugin for RMCloudPlugin {
                             material.cloud_coef = cloud.cloud_coef;
                             material.cloud_height = cloud.cloud_height;
                             material.sun_pen = cloud.sun_pen;
+                            material.scroll = cloud.scroll;
                         }
                         None => {}
                     };
@@ -127,6 +129,7 @@ impl Plugin for RMCloudPlugin {
                         value_factor: 0.0,
                         cloud_coef: 0.2,
                         cloud_height: 0.2,
+                        ..Default::default()
                     },
                     MaterialMeshBundle {
                         // mesh: meshes.add(cloud_gen::new(100.)),
@@ -176,7 +179,6 @@ pub fn worley_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Ve
 
 pub fn value_texture_data(buffer_dimensions: (usize, usize), scale: Vec2) -> Vec<f32> {
     let resolution = vec2(buffer_dimensions.0 as f32, buffer_dimensions.1 as f32);
-    println!("{resolution}");
     (0..buffer_dimensions.0)
         .flat_map(|x| (0..buffer_dimensions.1).map(move |y| (x, y)))
         .map(|(x, y)| {
@@ -351,6 +353,8 @@ pub struct RMCloudMaterial {
     pub cloud_coef: f32,
     #[uniform(0)]
     pub cloud_height: f32,
+    #[uniform(0)]
+    pub scroll: f32,
 
     #[texture(1)]
     #[sampler(2)]
